@@ -5,10 +5,18 @@ sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 FS = "http://127.0.0.1:8080/v1/projects/demo-best/databases/(default)/documents"
 H = {"Authorization": "Bearer owner", "Content-Type": "application/json"}
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shots")
+ENGINE = sys.argv[1] if len(sys.argv) > 1 else "edge"   # edge (Chromium = Android TWA engine) | webkit (iPhone Safari engine)
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "shots", ENGINE)
+import re
 os.makedirs(OUT, exist_ok=True)
 results = []
+ZPAGE = []
 def check(name, ok, info=""):
+    if ZPAGE:
+        try:
+            z = ZPAGE[0].evaluate("[Math.round(visualViewport.width), Math.round(visualViewport.scale*100)/100, document.documentElement.scrollWidth, document.activeElement && document.activeElement.id]")
+            print("   zoom-trace", z, flush=True)
+        except Exception: pass
     results.append((name, bool(ok))); print(("PASS " if ok else "FAIL ") + name + (" :: " + str(info) if info else ""), flush=True)
 def req(method, path, body=None):
     r = urllib.request.Request(FS + path, data=json.dumps(body).encode() if body is not None else None, headers=H, method=method)
@@ -61,21 +69,35 @@ put("/bests/b-wang/logs/l1", {"date": sun(1), "method": "visit", "content": "家
 
 errors = []
 with sync_playwright() as p:
-    br = p.chromium.launch(executable_path=r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
-    ctx = br.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, locale="ko-KR", accept_downloads=True)
+    if ENGINE == "webkit":
+        br = p.webkit.launch(); DEV = dict(p.devices["iPhone 14"])
+        # Windows WebKit applies the OS display scale (e.g. 120%) on top of the device scale -> CSS width 325 instead of 390.
+        # Measure that factor and compensate so the page sees exactly the iPhone 14 CSS viewport (390 wide).
+        _c = br.new_context(**DEV); _p = _c.new_page(); _p.goto("http://127.0.0.1:5000/install.html"); f = DEV["viewport"]["width"] / _p.evaluate("innerWidth"); _c.close()
+        DEV["viewport"] = {"width": round(DEV["viewport"]["width"] * f), "height": round(DEV["viewport"]["height"] * f)}
+        DEV["is_mobile"] = False   # mobile meta-viewport emulation is broken by the DPI scale on Windows WebKit; window = 390 CSS px already
+        if "screen" in DEV: DEV["screen"] = {"width": round(DEV["screen"]["width"] * f), "height": round(DEV["screen"]["height"] * f)}
+    else:
+        br = p.chromium.launch(executable_path=r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
+        DEV = {"viewport": {"width": 390, "height": 844}, "device_scale_factor": 2, "is_mobile": True, "has_touch": True}
+    print("engine:", ENGINE, br.version, DEV.get("viewport"), flush=True)
+    _c = br.new_context(**DEV); _p = _c.new_page(); _p.goto("http://127.0.0.1:5000/install.html")
+    print("css viewport:", _p.evaluate("[innerWidth, innerHeight, Math.round(devicePixelRatio*100)/100, navigator.userAgent]"), flush=True); _c.close()
+    ctx = br.new_context(**DEV, locale="ko-KR", accept_downloads=True)
     pg = ctx.new_page()
+    if ENGINE == "webkit": ZPAGE.append(pg)
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.goto("http://127.0.0.1:5000/")
     pg.wait_for_selector("#gBtn")
     check("logged-out: only sign-in screen (no tabs)", pg.is_hidden("#tabs") and pg.is_visible("#gBtn"))
-    pg.screenshot(path=f"{OUT}/0-signin-ko.png")
+    pg.screenshot(path=f"{OUT}/flow-0-signin-ko.png")
     pg.evaluate("window.__emuSignIn('kim-sub', '김목자')")
     pg.wait_for_selector("#jCode")
     check("signed-in non-staff: invite-code screen, no data", pg.is_hidden("#tabs"))
     pg.fill("#jCode", "WRONG999"); pg.click("#jBtn"); pg.wait_for_timeout(1500)
     check("wrong invite code rejected", pg.is_visible("#jCode") and "초대 코드가 맞지 않습니다" in pg.inner_text("body"))
-    pg.screenshot(path=f"{OUT}/1-join-ko.png")
+    pg.screenshot(path=f"{OUT}/flow-1-join-ko.png")
     pg.fill("#jCode", "testc0de"); pg.click("#jBtn")
     pg.wait_for_selector("#tabs:not([hidden])")
     me = [x for x in lst("/staff") if x[1].get("name") == "김목자"]
@@ -93,7 +115,7 @@ with sync_playwright() as p:
     check("dashboard (c) due/overdue: 김하늘", "김하늘" in du and "2일 지남" in du, du.replace("\n", " | "))
     stats = pg.inner_text(".stats")
     check("dashboard (d) counts + 8-week retention 3/5 (王 class+attending, 黃 group, 劉 settled kept; 吳 absent, 蔡 paused not)", "60%" in stats and "(3/5)" in stats, stats.replace("\n", " | "))
-    pg.screenshot(path=f"{OUT}/2-home-ko-screen.png"); pg.screenshot(path=f"{OUT}/2-home-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-2-home-ko.png")
     # register
     pg.click("#fab"); pg.wait_for_selector("#f_name")
     pg.fill("#f_name", "周恩惠 Grace"); pg.select_option("#f_gender", "f"); pg.select_option("#f_age", "30")
@@ -103,7 +125,7 @@ with sync_playwright() as p:
     pg.select_option("#f_caretaker", "staff-lee")
     pg.set_input_files("#f_photo", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public", "icon-512.png"))
     pg.wait_for_timeout(500)
-    pg.screenshot(path=f"{OUT}/3-register-ko-screen.png"); pg.screenshot(path=f"{OUT}/3-register-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-3-register-ko.png")
     pg.click("#fSave"); pg.wait_for_selector(".pipe"); pg.wait_for_timeout(500)
     bid = pg.evaluate("location.hash").split("/")[1]
     b = get("/bests/" + bid)
@@ -123,7 +145,7 @@ with sync_playwright() as p:
     logs = lst("/bests/" + bid + "/logs"); b = get("/bests/" + bid)
     check("contact log saved + lastContact/nextAction updated", len(logs) == 1 and logs[0][1]["method"] == "line" and b["lastContact"] == T and b["nextDue"] == T, (logs, b["lastContact"], b["nextAction"]))
     pg.wait_for_selector(".log")
-    pg.screenshot(path=f"{OUT}/4-detail-ko-screen.png"); pg.screenshot(path=f"{OUT}/4-detail-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-4-detail-ko.png")
     # attendance
     pg.click("a[data-tab=att]"); pg.wait_for_selector("#attDay")
     pg.fill("#attDay", sun(0)); pg.dispatch_event("#attDay", "change"); pg.wait_for_timeout(500)
@@ -134,7 +156,7 @@ with sync_playwright() as p:
     a = get("/attendance/" + sun(0))
     check("attendance un-check works", "b-chen" not in a["ids"] and bid in a["ids"], a["ids"])
     pg.click("[data-att='b-chen']"); pg.wait_for_timeout(800)
-    pg.screenshot(path=f"{OUT}/5-attendance-ko-screen.png"); pg.screenshot(path=f"{OUT}/5-attendance-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-5-attendance-ko.png")
     # home shows the new due item; mark done
     pg.click("a[data-tab=home]"); pg.wait_for_timeout(800)
     du = sec("해야 할 일")
@@ -147,7 +169,7 @@ with sync_playwright() as p:
     pg.select_option("#careSel", ""); pg.fill("#q", "0912"); pg.wait_for_timeout(200); n_q = pg.locator("#listBox .item").count()
     check("list: all 10 / stage first 2 / caretaker 박집사 4 / search phone 1", (n_all, n_first, n_park, n_q) == (10, 2, 4, 1), (n_all, n_first, n_park, n_q))
     pg.fill("#q", ""); pg.wait_for_timeout(200)
-    pg.screenshot(path=f"{OUT}/6-list-ko-screen.png"); pg.screenshot(path=f"{OUT}/6-list-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-6-list-ko.png")
     # tel: link + done button
     pg.goto("http://127.0.0.1:5000/#best/b-chen"); pg.wait_for_selector(".pipe")
     check("tap phone -> tel: link", pg.get_attribute("a[href^='tel:']", "href") == "tel:0912345678")
@@ -156,30 +178,92 @@ with sync_playwright() as p:
     check("next action 'done' clears it", get("/bests/b-kim")["nextAction"] == "" and "김하늘" not in sec("해야 할 일"))
     # admin: csv + invite
     pg.click("a[data-tab=more]"); pg.wait_for_selector("#csvBtn")
-    with pg.expect_download() as dl: pg.click("#csvBtn")
+    try:
+        with pg.expect_download(timeout=15000) as dl: pg.click("#csvBtn", no_wait_after=True, timeout=10000)
+    except Exception as ex:
+        pg.screenshot(path=f"{OUT}/_debug-csv.png")
+        print("DEBUG", pg.evaluate("""() => { const W = document.documentElement.clientWidth; return {W, iw: innerWidth, sw: document.documentElement.scrollWidth, vv: visualViewport.width,
+          off: [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > W + 1).slice(0, 12).map(e => e.tagName + '#' + e.id + '.' + e.className + ' r=' + Math.round(e.getBoundingClientRect().right) + ' w=' + Math.round(e.getBoundingClientRect().width))}; }"""), flush=True); raise
     path = dl.value.path(); csv = open(path, encoding="utf-8-sig", newline="").read()
     check("admin CSV export (10 BEST + header)", csv.count("\r\n") == 10 and "周恩惠 Grace" in csv, csv.splitlines()[0])
     pg.click("#invBtn"); pg.wait_for_timeout(800)
     newcode = pg.inner_text("#invOut").split(":")[-1].strip()
     check("admin changes invite code", len(newcode) == 8 and get("/config/invite")["code"] == newcode, newcode)
-    pg.screenshot(path=f"{OUT}/7-more-ko-screen.png"); pg.screenshot(path=f"{OUT}/7-more-ko.png", full_page=True)
+    pg.screenshot(path=f"{OUT}/flow-7-more-ko.png")
     # Chinese
     pg.click("#langBtn"); pg.goto("http://127.0.0.1:5000/#home"); pg.wait_for_timeout(800)
     zh = pg.inner_text("body")
     check("zh UI uses BEST label, no 새신자/新朋友 labels", "今天需要關懷的 BEST" in zh and "新朋友" not in zh and "새신자" not in zh)
-    pg.screenshot(path=f"{OUT}/2-home-zh-screen.png"); pg.screenshot(path=f"{OUT}/2-home-zh.png", full_page=True)
-    pg.click("a[data-tab=list]"); pg.wait_for_timeout(500); pg.screenshot(path=f"{OUT}/6-list-zh-screen.png"); pg.screenshot(path=f"{OUT}/6-list-zh.png", full_page=True)
-    pg.goto("http://127.0.0.1:5000/#best/" + bid); pg.wait_for_selector(".pipe"); pg.wait_for_timeout(500); pg.screenshot(path=f"{OUT}/4-detail-zh-screen.png"); pg.screenshot(path=f"{OUT}/4-detail-zh.png", full_page=True)
-    pg.goto("http://127.0.0.1:5000/#new"); pg.wait_for_selector("#f_name"); pg.screenshot(path=f"{OUT}/3-register-zh-screen.png"); pg.screenshot(path=f"{OUT}/3-register-zh.png", full_page=True)
-    pg.goto("http://127.0.0.1:5000/#att"); pg.wait_for_timeout(500); pg.screenshot(path=f"{OUT}/5-attendance-zh-screen.png"); pg.screenshot(path=f"{OUT}/5-attendance-zh.png", full_page=True)
-    over = pg.evaluate("document.documentElement.scrollWidth > window.innerWidth")
-    check("no horizontal overflow at 390px", not over)
+    pg.screenshot(path=f"{OUT}/flow-2-home-zh.png")
+    over = pg.evaluate("""() => { const W = innerWidth; return document.documentElement.scrollWidth > W + 1 ? [document.documentElement.scrollWidth, W, location.hash, [...document.querySelectorAll('body *')].filter(e => e.getBoundingClientRect().right > W + 1).slice(0, 6).map(e => e.tagName + '.' + e.className + ' r=' + Math.round(e.getBoundingClientRect().right))] : null; }""")
+    check("no horizontal overflow at 390px", not over, over)
     # dark mode check
-    dctx = br.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, color_scheme="dark")
-    ctx.storage_state(path=os.path.join(OUT, "_state.json"))
-    dctx.close()
-    # missing strings: every key exists in both languages
-    miss = pg.evaluate("(() => { const s = document.querySelector('script[type=module]').textContent; return 0; })()")
+    small = pg.evaluate("[...document.querySelectorAll('input,select,textarea')].filter(e => parseFloat(getComputedStyle(e).fontSize) < 16).length")
+    pg.goto("http://127.0.0.1:5000/#new"); pg.wait_for_selector("#f_name")
+    small += pg.evaluate("[...document.querySelectorAll('input,select,textarea')].filter(e => e.type !== 'file' && parseFloat(getComputedStyle(e).fontSize) < 16).length")
+    check("all inputs font-size >= 16px (no iOS zoom)", small == 0, small)
+    # ---------- full bilingual tour: every screen in both languages, untranslated-text detector ----------
+    DATA = ["陳小明", "林美華", "張志豪", "王淑芬", "黃建國", "吳佳蓉", "김하늘", "劉家豪", "蔡雅婷", "李姊妹", "박집사", "김목자", "周恩惠 Grace",
+            "주중 LINE으로 안부", "家庭探訪，一起吃晚餐", "工作穩定", "台北市 信義區", "先生、女兒(5歲)", "女兒身體健康", "喜歡詩歌",
+            "LINE로 환영 인사, 다음 주일 다시 오기로", "딸의 건강", "주일 예배 후 식사 초대", "kim-sub@example.com"]
+    DATA += [d[0] for d in DATA] + ["Tour", "T"]   # avatar initials are data too
+    HANGUL, HAN = re.compile("[\uac00-\ud7a3]"), re.compile("[\u4e00-\u9fff]")
+    JS_TEXTS = """() => { const out = []; const vis = (el) => el && (el.tagName === 'OPTION' || el.getClientRects().length > 0);
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n;
+      while ((n = w.nextNode())) { const s = n.textContent.trim(); if (s && vis(n.parentElement) && !n.parentElement.closest('#langBtn')) out.push(s); }
+      document.querySelectorAll('[placeholder]').forEach((e) => out.push(e.placeholder)); out.push(document.title); return out; }"""
+    def leftovers(page, lang):
+        bad = []
+        for s in page.evaluate(JS_TEXTS):
+            x = s
+            for d in sorted(DATA, key=len, reverse=True): x = x.replace(d, "")
+            if (lang == "zh" and HANGUL.search(x)) or (lang == "ko" and HAN.search(x)): bad.append(s)
+        return bad
+    def setlang(page, lang): page.evaluate(f"localStorage.setItem('best.lang', '{lang}')")
+    zoom_bad = []
+    for lang in ("ko", "zh"):
+        bad_all = {}
+        pg.goto("http://127.0.0.1:5000/#home"); pg.wait_for_selector(".stats")
+        if pg.evaluate("document.documentElement.lang").startswith("zh") != (lang == "zh"): pg.click("#langBtn")
+        screens = [("home", "#home", ".stats"), ("list", "#list", "#listBox"), ("detail", "#best/" + bid, ".pipe"), ("register", "#new", "#f_name"),
+                   ("attendance", "#att", "#attDay"), ("more", "#more", "#csvBtn")]
+        for name, h, sel in screens:
+            pg.goto("http://127.0.0.1:5000/" + h)
+            try: pg.wait_for_selector(sel, timeout=15000)
+            except Exception:
+                pg.screenshot(path=f"{OUT}/_debug-{lang}-{name}.png"); print("DEBUG-ERRS", errors[-6:], flush=True); print("DEBUG", name, pg.evaluate("[location.href, document.activeElement && document.activeElement.outerHTML.slice(0,120), document.querySelector('#view').innerText.slice(0,200)]"), flush=True); raise
+            pg.wait_for_timeout(600)
+            if name == "detail":
+                pg.click("#addLogBtn"); pg.locator("details").evaluate("d => d.open = true")
+            if name == "attendance":
+                pg.fill("#attDay", sun(0)); pg.dispatch_event("#attDay", "change"); pg.wait_for_timeout(400)
+            pg.screenshot(path=f"{OUT}/{lang}-{name}.png"); pg.screenshot(path=f"{OUT}/{lang}-{name}-full.png", full_page=True)
+            b_ = leftovers(pg, lang)
+            if b_: bad_all[name] = b_
+            z = pg.evaluate("[document.documentElement.scrollWidth, innerWidth, Math.round(visualViewport.width)]")
+            if z[0] > z[1] + 1 or z[2] < z[1] - 1: zoom_bad.append((lang, name, z))
+        pg.goto("http://127.0.0.1:5000/install.html"); pg.wait_for_selector("ol"); pg.wait_for_timeout(300)
+        pg.screenshot(path=f"{OUT}/{lang}-install.png"); pg.screenshot(path=f"{OUT}/{lang}-install-full.png", full_page=True)
+        b_ = leftovers(pg, lang)
+        if b_: bad_all["install"] = b_
+        pg.goto("http://127.0.0.1:5000/#more"); pg.wait_for_selector("#csvBtn")
+        with pg.expect_download() as dl: pg.click("#csvBtn", no_wait_after=True)
+        head = open(dl.value.path(), encoding="utf-8-sig", newline="").read().split("\r\n")[0]
+        if (lang == "zh" and HANGUL.search(head)) or (lang == "ko" and HAN.search(head)): bad_all["csv-header"] = [head]
+        # logged-out screens in a fresh context: sign-in, invite code + wrong-code message
+        c2 = br.new_context(**DEV); p2 = c2.new_page()
+        p2.add_init_script(f"localStorage.setItem('best.lang', '{lang}')")
+        p2.goto("http://127.0.0.1:5000/"); p2.wait_for_selector("#gBtn")
+        p2.screenshot(path=f"{OUT}/{lang}-signin.png"); b_ = leftovers(p2, lang)
+        if b_: bad_all["signin"] = b_
+        p2.evaluate(f"window.__emuSignIn('tour-{lang}', 'Tour')"); p2.wait_for_selector("#jCode")
+        p2.fill("#jCode", "NOPE0000"); p2.click("#jBtn"); p2.wait_for_selector(".toast")
+        p2.screenshot(path=f"{OUT}/{lang}-join.png"); b_ = leftovers(p2, lang)
+        if b_: bad_all["join"] = b_
+        c2.close()
+        check(f"{lang}: every screen fully {('Korean' if lang == 'ko' else 'Traditional Chinese')} (home/list/detail+log form/register/attendance/more/install/sign-in/invite+error/CSV header)", not bad_all, bad_all)
+    setlang(pg, "ko")
+    check("every screen: no horizontal overflow / no unwanted zoom (both languages)", not zoom_bad, zoom_bad)
     # deactivate: admin deactivates 박집사 -> that staff has no access (rules test covers), UI shows inactive
     pg.goto("http://127.0.0.1:5000/#more"); pg.wait_for_selector("[data-act='staff-park']")
     pg.click("[data-act='staff-park']"); pg.wait_for_timeout(800)
@@ -187,9 +271,10 @@ with sync_playwright() as p:
     pg.click("#soBtn"); pg.wait_for_selector("#gBtn")
     check("sign-out returns to sign-in screen", pg.is_hidden("#tabs"))
     br.close()
-try: os.remove(os.path.join(OUT, "_state.json"))
-except Exception: pass
-real = [e for e in errors if "favicon" not in e]
+emu_noise = [e for e in errors if "127.0.0.1:8080/google.firestore.v1.Firestore/" in e and "access control checks" in e]
+real = [e for e in errors if "favicon" not in e and e not in emu_noise
+        and not (ENGINE == "webkit" and emu_noise and ("Could not reach Cloud Firestore backend" in e))]
+if emu_noise: print(f"note: {len(emu_noise)} WebKit<->local-emulator channel aborts on page navigation ('access control checks') ignored", flush=True)
 check("no console errors", not real, real[:5])
 fails = [n for n, ok in results if not ok]
 print(f"\nE2E: {len(results) - len(fails)}/{len(results)} passed")

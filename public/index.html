@@ -3,13 +3,16 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>BEST Care</title>
+<title>BEST</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#E8743B">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="BEST">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex,nofollow">
 <style>
 :root{
@@ -26,9 +29,10 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{margin:0}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-padding-top:calc(72px + env(safe-area-inset-top,0px));scroll-padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.5;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{font:inherit;color:inherit}
-.app{max-width:560px;margin:0 auto;min-height:100vh;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+.app{max-width:560px;margin:0 auto;min-height:100vh;min-height:100dvh;padding-bottom:calc(84px + env(safe-area-inset-bottom,0px));padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 header.top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;align-items:center;gap:10px;
   padding:calc(10px + env(safe-area-inset-top,0px)) 16px 10px;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:21px;letter-spacing:.3px}
@@ -36,7 +40,7 @@ header.top{position:sticky;top:0;z-index:5;background:var(--bg);display:flex;ali
 .top .sp{flex:1}
 .back{border:0;background:var(--chip);border-radius:12px;min-width:48px;height:44px;font-size:22px;cursor:pointer}
 .lang{border:2px solid var(--pri);background:var(--paper);color:var(--pri-deep);border-radius:99px;padding:6px 14px;font-weight:700;cursor:pointer;min-height:40px}
-main{padding:14px 16px;display:grid;gap:14px}
+main{padding:14px 16px;display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
 h2{font-size:19px;margin:6px 0 0}
 .card{background:var(--paper);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow)}
 .muted{color:var(--soft);font-size:15px}
@@ -80,7 +84,7 @@ input.i:focus,select.i:focus,textarea.i:focus{outline:3px solid color-mix(in srg
 .empty{color:var(--soft);font-size:15px;padding:6px 0}
 /* tabs */
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--paper);border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px)}
+  display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
 nav.tabs a{display:grid;place-items:center;gap:0;min-height:62px;text-decoration:none;color:var(--soft);font-size:13px;font-weight:700}
 nav.tabs a .ic{font-size:22px;line-height:1}
 nav.tabs a.on{color:var(--pri-deep)}
@@ -118,9 +122,12 @@ nav.tabs a.on{color:var(--pri-deep)}
 .center{min-height:70vh;display:grid;place-items:center;text-align:center;padding:24px}
 .center .big{width:110px;height:110px;border-radius:30px;background:var(--pri);color:#fff;display:grid;place-items:center;font-size:32px;font-weight:900;margin:0 auto 14px;letter-spacing:1px}
 .toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#2b221d;color:#fff;padding:10px 18px;border-radius:12px;z-index:20;font-size:15px;max-width:90vw}
-.search{display:grid;gap:8px}
+.search{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
 .seg{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
 .seg button{flex:none;min-height:40px;border-radius:99px;border:1.5px solid var(--line);background:var(--paper);padding:0 12px;cursor:pointer;font-size:15px}
+.warnbox{background:var(--warn-bg);color:var(--warn);border-radius:12px;padding:10px 12px;font-size:15px;text-align:left}
+.links{display:flex;gap:14px;justify-content:center;margin-top:14px;font-size:15px}
+.links a{color:var(--pri-deep);font-weight:700}
 .seg button.on{background:var(--pri);border-color:var(--pri);color:var(--pri-ink);font-weight:700}
 </style>
 </head>
@@ -145,7 +152,7 @@ nav.tabs a.on{color:var(--pri-deep)}
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, connectAuthEmulator, signInWithCredential }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, query, orderBy, limit,
+import { getFirestore, initializeFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, query, orderBy, limit,
   writeBatch, serverTimestamp, arrayUnion, arrayRemove, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 
 const LOCAL = ['localhost', '127.0.0.1'].includes(location.hostname);
@@ -159,7 +166,8 @@ const fbApp = initializeApp({
   appId: '1:652903620340:web:041f27b6c59106d76748a1',
 });
 const auth = getAuth(fbApp);
-const db = getFirestore(fbApp);
+// Local emulator only: force long-polling (WebKit drops the emulator's streaming channel on navigation). Production keeps the SDK default.
+const db = LOCAL ? initializeFirestore(fbApp, { experimentalForceLongPolling: true }) : getFirestore(fbApp);
 if (LOCAL) {   // local development / screenshots only: Firebase emulators
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
@@ -196,7 +204,9 @@ const STR = {
     g_m: '남', g_f: '여', a_child: '어린이', a_teen: '청소년', a_20: '20대', a_30: '30대', a_40: '40대', a_50: '50대', a_60: '60대 이상',
     f_first: '처음 교회에 옴', f_moved: '다른 교회에서 옮김', f_returning: '다시 교회로 돌아옴',
     s_first: '첫 방문', s_welcome: '환영 연락', s_revisit: '재방문', s_class: 'BEST반', s_group: '소그룹 연결', s_settled: '정착(등록교인)',
-    s_paused: '보류', s_unreachable: '연락안됨', sideStates: '기타 상태', by: '기록', err: '오류가 났습니다: ', offline: '저장하지 못했습니다. 다시 시도하세요.',
+    s_paused: '보류', s_unreachable: '연락안됨', sideStates: '기타 상태', by: '기록', err: '오류가 났습니다. 다시 시도하세요.', offline: '인터넷 연결을 확인하고 다시 시도하세요.', errPerm: '권한이 없습니다. 관리자에게 문의하세요.',
+    install: '설치 방법 (iPhone · Android)', inAppWarn: 'LINE 등 앱 안의 브라우저에서는 Google 로그인이 되지 않습니다. 오른쪽 위 메뉴에서 「Safari로 열기」 또는 「Chrome으로 열기」를 누르세요.',
+    openLine: 'LINE에서 열기', retry: '다시 시도', loadFail: '정보를 불러오지 못했습니다. 인터넷 연결을 확인하세요.', loading: '불러오는 중…', signinCancel: '로그인을 취소했습니다', popupBlocked: '로그인 창이 막혔습니다. 다시 눌러 주세요.',
   },
   zh: {
     brand: 'BEST 關懷', langBtn: '한국어', tabHome: '今天', tabList: 'BEST 名單', tabAtt: '主日出席', tabMore: '更多',
@@ -226,7 +236,9 @@ const STR = {
     g_m: '男', g_f: '女', a_child: '兒童', a_teen: '青少年', a_20: '20多歲', a_30: '30多歲', a_40: '40多歲', a_50: '50多歲', a_60: '60歲以上',
     f_first: '第一次來教會', f_moved: '從其他教會轉來', f_returning: '重新回到教會',
     s_first: '初次來訪', s_welcome: '歡迎聯繫', s_revisit: '再次來訪', s_class: 'BEST班', s_group: '連結小組', s_settled: '定著(登記會友)',
-    s_paused: '暫停', s_unreachable: '聯絡不上', sideStates: '其他狀態', by: '紀錄', err: '發生錯誤：', offline: '無法儲存，請再試一次。',
+    s_paused: '暫停', s_unreachable: '聯絡不上', sideStates: '其他狀態', by: '紀錄', err: '發生錯誤，請再試一次。', offline: '請檢查網路連線後再試一次。', errPerm: '沒有權限，請聯絡管理者。',
+    install: '安裝方法（iPhone・Android）', inAppWarn: '在 LINE 等 App 內建的瀏覽器中無法用 Google 登入。請點右上角選單，選擇「用 Safari 開啟」或「用 Chrome 開啟」。',
+    openLine: '在 LINE 開啟', retry: '重試', loadFail: '無法載入資料，請檢查網路連線。', loading: '載入中…', signinCancel: '已取消登入', popupBlocked: '登入視窗被擋住了，請再點一次。',
   },
 };
 let lang = localStorage.getItem('best.lang') || ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ko');
@@ -263,24 +275,39 @@ let attDay = lastSunday();
 let logUnsub = null, logsCache = [];
 
 /* ---------- auth flow ---------- */
-getRedirectResult(auth).catch(() => {});
+getRedirectResult(auth).catch(onSignInErr);
+let meErr = false;
+async function loadMe(u) {   // retry: a transient network error must not look like "not joined yet"
+  for (let i = 0; ; i++) {
+    try { const snap = await getDoc(doc(db, 'staff', u.uid)); return snap.exists() ? snap.data() : null; }
+    catch (e) { if (i >= 5) throw e; await new Promise((r) => setTimeout(r, 700 * (i + 1))); }
+  }
+}
 onAuthStateChanged(auth, async (u) => {
-  unsubs.forEach((f) => f()); unsubs = []; me = u; meDoc = null;
+  unsubs.forEach((f) => f()); unsubs = []; me = u; meDoc = null; meErr = false;
   if (!u) return render();
-  try {
-    const snap = await getDoc(doc(db, 'staff', u.uid));
-    meDoc = snap.exists() ? snap.data() : null;
-  } catch (e) { meDoc = null; }
+  try { meDoc = await loadMe(u); } catch (e) { console.error(e); meErr = true; }
   if (meDoc && meDoc.active) startData();
   render();
 });
+const UA = navigator.userAgent || '';
+const IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const STANDALONE = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+const IN_APP = /\bLine\/|FBAN|FBAV|Instagram|KAKAOTALK|MicroMessenger/i.test(UA);
 async function doSignIn() {
   const p = new GoogleAuthProvider(); p.setCustomParameters({ prompt: 'select_account' });
+  // iOS home-screen app: popups open outside the app -> use redirect (first-party: authDomain = this host).
+  if (IOS && STANDALONE) return signInWithRedirect(auth, p).catch(onSignInErr);
   try { await signInWithPopup(auth, p); }
   catch (e) {
-    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(e.code)) return signInWithRedirect(auth, p);
-    if (e.code !== 'auth/popup-closed-by-user') toast(t('signinFail') + ' (' + e.code + ')');
+    if (['auth/popup-blocked', 'auth/operation-not-supported-in-this-environment', 'auth/cancelled-popup-request'].includes(e.code)) return signInWithRedirect(auth, p).catch(onSignInErr);
+    onSignInErr(e);
   }
+}
+function onSignInErr(e) {
+  console.error(e);
+  if (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/user-cancelled') return toast(t('signinCancel'));
+  toast(e.code === 'auth/network-request-failed' ? t('offline') : t('signinFail'));
 }
 function startData() {
   unsubs.push(onSnapshot(collection(db, 'bests'), (qs) => { bests = new Map(qs.docs.map((d) => [d.id, { id: d.id, ...d.data() }])); rerender(); }, onErr));
@@ -288,7 +315,13 @@ function startData() {
   unsubs.push(onSnapshot(collection(db, 'attendance'), (qs) => {   // one small doc per Sunday
     attendance = qs.docs.map((d) => ({ id: d.id, ids: new Set(d.data().ids || []) })).sort((a, b) => b.id.localeCompare(a.id)); rerender(); }, onErr));
 }
-function onErr(e) { console.error(e); toast(t('err') + (e.code || e.message)); }
+function errMsg(e) {
+  const c = (e && e.code) || '';
+  if (c.includes('permission-denied')) return t('errPerm');
+  if (c.includes('unavailable') || c.includes('network') || c.includes('deadline')) return t('offline');
+  return t('err');
+}
+function onErr(e) { console.error(e); toast(errMsg(e)); }
 let rerenderTimer = 0;
 function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { if (!document.activeElement || !document.activeElement.matches('input,textarea,select')) render(); else if (route().name === 'home' || route().name === 'att') render(); }, 30); }
 
@@ -301,6 +334,7 @@ $('#fab').onclick = () => { location.hash = '#new'; };
 
 function render() {
   document.documentElement.lang = lang === 'zh' ? 'zh-Hant-TW' : 'ko';
+  document.title = t('brand');
   $('#brandTxt').textContent = t('brand').replace('BEST ', '');
   $('#langBtn').textContent = t('langBtn');
   document.querySelectorAll('[data-t]').forEach((el) => { el.textContent = t(el.dataset.t); });
@@ -314,6 +348,8 @@ function render() {
   $('#fab').textContent = t('newBest');
   document.querySelectorAll('nav.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === r.name));
   if (!me) return v.innerHTML = viewSignin(), bindSignin();
+  if (meErr) return v.innerHTML = '<div class="center"><div><div class="big">BEST</div><p class="muted">' + esc(t('loadFail')) + '</p><button class="btn" id="retryBtn">' + esc(t('retry')) +
+    '</button></div></div>', $('#retryBtn').onclick = async () => { meErr = false; try { meDoc = await loadMe(me); } catch (e) { meErr = true; } if (meDoc && meDoc.active) startData(); render(); };
   if (!meDoc) return v.innerHTML = viewJoin(), bindJoin();
   if (!meDoc.active) return v.innerHTML = viewInactive(), bindInactive();
   if (r.name === 'list') return v.innerHTML = viewList(), bindList();
@@ -322,14 +358,15 @@ function render() {
   if (r.name === 'new') return v.innerHTML = viewForm(null), bindForm(null);
   if (r.name === 'edit' && bests.has(r.id)) return v.innerHTML = viewForm(bests.get(r.id)), bindForm(bests.get(r.id));
   if (r.name === 'best' && bests.has(r.id)) return v.innerHTML = viewDetail(bests.get(r.id)), bindDetail(bests.get(r.id));
-  if (r.name === 'best' || r.name === 'edit') { v.innerHTML = '<p class="empty">…</p>'; return; }
+  if (r.name === 'best' || r.name === 'edit') { v.innerHTML = '<p class="empty">' + esc(t('loading')) + '</p>'; return; }
   v.innerHTML = viewHome(); bindHome();
 }
 
 /* ---------- sign in / join ---------- */
 function viewSignin() {
   return '<div class="center"><div><div class="big">BEST</div><h2>' + esc(t('signinTitle')) + '</h2><p class="muted" style="white-space:pre-line">' + esc(t('signinSub')) +
-    '</p><button class="btn wide" id="gBtn">' + esc(t('signinBtn')) + '</button></div></div>';
+    '</p>' + (IN_APP ? '<p class="warnbox">' + esc(t('inAppWarn')) + '</p>' : '') + '<button class="btn wide" id="gBtn">' + esc(t('signinBtn')) + '</button>' +
+    '<div class="links"><a href="install.html">' + esc(t('install')) + '</a></div></div></div>';
 }
 function bindSignin() { $('#gBtn').onclick = doSignIn; }
 function viewJoin() {
@@ -530,7 +567,7 @@ function viewDetail(b) {
   let h = '<div class="card"><div class="hero">' + ava(b) + '<div style="min-width:0"><div class="nm">' + esc(b.name) + '</div>' + stageChip(b.stage) +
     (b.lastContact ? ' <span class="muted">' + esc(t('lastContact')) + ' ' + esc(fmtDate(b.lastContact)) + '</span>' : '') + '</div></div>' +
     '<div class="row" style="margin-top:12px">' + (b.phone ? '<a class="btn small" href="tel:' + esc(b.phone.replace(/[^0-9+]/g, '')) + '">📞 ' + esc(t('call')) + '</a>' : '') +
-    (b.line ? '<button class="btn small ghost" id="cpLine">LINE · ' + esc(b.line) + ' ⧉</button>' : '') +
+    (b.line ? '<button class="btn small ghost" id="cpLine">' + esc(t('copyLine')) + ' · ' + esc(b.line) + '</button><a class="btn small ghost" href="https://line.me/R/ti/p/~' + encodeURIComponent(b.line) + '" target="_blank" rel="noopener">' + esc(t('openLine')) + '</a>' : '') +
     '<a class="btn small ghost" href="#edit/' + esc(b.id) + '">✎ ' + esc(t('editBest')) + '</a></div>' +
     '<dl class="kv" style="margin-top:12px">' + kv('phone', esc(b.phone)) + kv('gender', b.gender ? esc(t('g_' + b.gender)) : '') + kv('age', b.age ? esc(t('a_' + b.age)) : '') +
     kv('area', esc(b.area)) + kv('firstVisit', esc(b.firstVisit)) + kv('invitedBy', esc(b.invitedBy)) + kv('faith', b.faith ? esc(t('f_' + b.faith)) : '') +
@@ -630,7 +667,7 @@ function viewMore() {
   let h = '<h2>' + esc(t('moreTitle')) + '</h2><div class="card" style="display:grid;gap:10px"><b>' + esc(t('me')) + '</b>' +
     '<label class="f">' + esc(t('myName')) + '<input class="i" id="myName" maxlength="40" value="' + esc(meDoc.name) + '"></label>' +
     '<button class="btn ghost" id="renameBtn">' + esc(t('rename')) + '</button><p class="muted" style="margin:0">' + esc(me.email || '') + (admin ? ' · ' + esc(t('admin')) : '') + '</p>' +
-    '<button class="btn ghost" id="soBtn">' + esc(t('signout')) + '</button></div>';
+    '<a class="btn ghost" href="install.html">' + esc(t('install')) + '</a><button class="btn ghost" id="soBtn">' + esc(t('signout')) + '</button></div>';
   h += '<div class="card"><b>' + esc(t('staffList')) + ' · ' + list.filter((s) => s.active).length + '</b>' + list.map((s) => '<div class="item" style="cursor:default"><span class="ava">' + initial(s.name) + '</span><div class="t"><div class="n">' + esc(s.name) +
     (s.role === 'admin' ? ' <span class="chip">' + esc(t('admin')) + '</span>' : '') + (!s.active ? ' <span class="tag">' + esc(t('inactive')) + '</span>' : '') + '</div></div>' +
     (admin && s.id !== me.uid ? '<button class="btn small ' + (s.active ? 'warn' : 'ghost') + '" data-act="' + esc(s.id) + '" data-on="' + (s.active ? '0' : '1') + '">' + esc(s.active ? t('deactivate') : t('activate')) + '</button>' : '') + '</div>').join('') + '</div>';

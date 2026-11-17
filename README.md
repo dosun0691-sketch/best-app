@@ -29,11 +29,18 @@ curl -s -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application
 ```
 Use `"staff"` to remove admin. Reset the invite code the same way on `config/invite` (field `code`, 8 chars A-Z0-9), or from the app (admin → 더보기 / 更多).
 
+## iPhone / Android
+- iPhone: Safari → Share → 홈 화면에 추가 / 加入主畫面 (PWA; guide at /install.html, ko + zh). Sign-in uses redirect in the iOS home-screen app
+  (authDomain = this hosting domain, first-party /__/auth/handler); popup elsewhere. In-app browsers (LINE etc.) show a "open in Safari/Chrome" warning.
+- Android: TWA APK (below). install.html has `const APK_URL = ''` — set it to the published APK URL (Spark Hosting cannot serve .apk).
+
 ## Tests
 ```bash
 # JDK 21+ required by the emulators (portable copy: ~/.jdks/jdk-21*)
 firebase emulators:exec --only firestore --project demo-best "cd test && npm test"
-firebase emulators:exec --only auth,firestore,hosting --project demo-best "python -I test/e2e.py"
+firebase emulators:exec --only auth,firestore,hosting --project demo-best "python -I test/e2e.py edge"     # Chromium (Android TWA engine)
+firebase emulators:exec --only auth,firestore,hosting --project demo-best "python -I test/e2e.py webkit"   # WebKit, iPhone 14 (python -m playwright install webkit)
+python -I test/live_webkit.py   # live site sign-in + install page in WebKit
 ```
 
 ## Deploy / Android
