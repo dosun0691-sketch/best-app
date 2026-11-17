@@ -582,7 +582,7 @@ function viewForm(b) {
     '<label class="f">' + esc(t('faith')) + '<select class="i" id="f_faith">' + opt(FAITHS, v.faith, 'f_') + '</select></label>' +
     '<label class="f">' + esc(t('caretaker')) + '<select class="i" id="f_caretaker"><option value="">' + esc(t('none')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (v.caretaker === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>' +
-    ta('family') + ta('memo') + ta('prayer') +
+    ta('family') + ta('memo') + (b ? suppBoxHtml(b) : '') + ta('prayer') +
     '<button class="btn wide" id="fSave">' + esc(t('save')) + '</button><button class="btn ghost wide" id="fCancel">' + esc(t('cancel')) + '</button>' +
     (b && meDoc.role === 'admin' ? '<button class="btn warn wide" id="fDel">' + esc(t('del')) + '</button>' : '') + '</div>';
 }
@@ -604,6 +604,7 @@ function bindForm(b) {
   $('#f_photo').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { formPhoto = await resizePhoto(f); $('#phPrev').innerHTML = ava({ photo: formPhoto }); $('#phDel').hidden = false; } catch (er) { onErr(er); } };
   $('#phDel').onclick = () => { formPhoto = ''; $('#phPrev').innerHTML = ava({ name: $('#f_name').value }); $('#phDel').hidden = true; };
   $('#fCancel').onclick = () => history.back();
+  if (b) bindSupp(b);
   if ($('#fDel')) $('#fDel').onclick = async () => {
     if (!confirm(t('delAsk'))) return;
     try {
@@ -642,9 +643,8 @@ function viewDetail(b) {
     '<dl class="kv" style="margin-top:12px">' + kv('gender', b.gender ? esc(t('g_' + b.gender)) : '') + kv('age', b.age ? esc(t('a_' + b.age)) : '') +
     kv('job', esc(b.job)) + kv('school', esc(b.school)) + kv('grade', esc(b.grade)) +
     kv('area', esc(b.area)) + kv('firstVisit', esc(b.firstVisit)) + kv('invitedBy', esc(b.invitedBy)) + kv('faith', b.faith ? esc(t('f_' + b.faith)) : '') +
-    kv('family', esc(b.family)) + kv('memo', esc(b.memo)) + '</dl>' +
-    '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div><div id="suppList">' + notesHtml(b) + '</div>' +
-    '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea><button class="btn small ghost" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>' +
+    kv('family', esc(b.family)) + '<dt>' + esc(t('memo')) + '</dt><dd>' + (b.memo ? esc(b.memo) : '<span class="muted">—</span>') + '</dd></dl>' +
+    suppBoxHtml(b) +
     '<dl class="kv">' + kv('prayer', esc(b.prayer)) + '</dl></div>';
   h += '<div class="card"><label class="f">' + esc(t('caretaker')) + '<select class="i" id="careSel"><option value="">' + esc(t('none')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (b.caretaker === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label></div>';
@@ -673,12 +673,35 @@ function viewDetail(b) {
 /* supplements ("보충 / 補充") under the memo: bests/{id}/notes/{nid} {text, by, byName, at} - append-only; author or admin may delete */
 let notesFor = null, notesUnsub = null, notesCache = [];
 const fmtDT = (d) => d ? ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : '';
+function suppBoxHtml(b) {
+  return '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div><div id="suppList">' + notesHtml(b) + '</div>' +
+    '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea><button class="btn small ghost" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>';
+}
+function bindSupp(b) {
+  if (notesFor !== b.id) {
+    if (notesUnsub) notesUnsub(); notesFor = b.id; notesCache = [];
+    notesUnsub = onSnapshot(collection(db, 'bests', b.id, 'notes'), (qs) => {
+      notesCache = qs.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { id: d.id, _b: b.id, ...x, atD: x.at ? x.at.toDate() : null }; })
+        .sort((p, q) => (p.atD || 0) - (q.atD || 0));   // newest last
+      const el = $('#suppList'); if (el && route().id === b.id) { el.innerHTML = notesHtml(b); bindNotes(b); }
+    }, onErr);
+  }
+  bindNotes(b);
+  $('#suppAdd').onclick = async (e) => {
+    e.preventDefault();
+    const text = $('#suppTxt').value.trim().slice(0, 500); if (!text) return $('#suppTxt').focus();
+    $('#suppAdd').disabled = true;
+    try { await addDoc(collection(db, 'bests', b.id, 'notes'), { text, by: me.uid, byName: (meDoc.name || '').slice(0, 40), at: serverTimestamp() }); $('#suppTxt').value = ''; toast(t('saved')); }
+    catch (e) { onErr(e); }
+    $('#suppAdd').disabled = false;
+  };
+}
 function notesHtml(b) {
   const N = notesCache.filter((n) => n._b === b.id);
   if (!N.length) return '<p class="empty" style="margin:0">' + esc(t('suppNone')) + '</p>';
-  return N.map((n) => '<div class="sn" data-note="' + esc(n.id) + '"><p>' + esc(n.text) + '</p><div class="sm"><span>' + esc(t('suppAt')) + ' ' + esc(fmtDT(n.atD)) + '</span><span>· ' +
-    esc(t('suppBy')) + ' ' + esc(careName(n.by) || n.byName) + '</span>' + (n.by === me.uid || meDoc.role === 'admin' ? '<button class="btn small ghost" data-ndel="' + esc(n.id) + '">' + esc(t('suppDel')) + '</button>' : '') +
-    '</div></div>').join('');
+  return N.map((n) => '<div class="sn" data-note="' + esc(n.id) + '"><div class="sm"><span><b>' + esc(t('suppAt')) + '</b> ' + esc(fmtDT(n.atD)) + '</span><span><b>' +
+    esc(t('suppBy')) + '</b> ' + esc(careName(n.by) || n.byName) + '</span></div><p><b class="muted">' + esc(t('content')) + '</b> ' + esc(n.text) + '</p>' +
+    (n.by === me.uid || meDoc.role === 'admin' ? '<div style="text-align:right"><button class="btn small ghost" data-ndel="' + esc(n.id) + '">' + esc(t('suppDel')) + '</button></div>' : '') + '</div>').join('');
 }
 function bindNotes(b) {
   document.querySelectorAll('[data-ndel]').forEach((el) => el.onclick = async () => {
@@ -702,22 +725,7 @@ function bindDetail(b) {
       const el = $('#logList'); if (el && route().id === b.id) el.innerHTML = logsHtml(b);
     }, onErr);
   }
-  if (notesFor !== b.id) {
-    if (notesUnsub) notesUnsub(); notesFor = b.id; notesCache = [];
-    notesUnsub = onSnapshot(collection(db, 'bests', b.id, 'notes'), (qs) => {
-      notesCache = qs.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { id: d.id, _b: b.id, ...x, atD: x.at ? x.at.toDate() : null }; })
-        .sort((p, q) => (p.atD || 0) - (q.atD || 0));   // newest last
-      const el = $('#suppList'); if (el && route().id === b.id) { el.innerHTML = notesHtml(b); bindNotes(b); }
-    }, onErr);
-  }
-  bindNotes(b);
-  $('#suppAdd').onclick = async () => {
-    const text = $('#suppTxt').value.trim().slice(0, 500); if (!text) return $('#suppTxt').focus();
-    $('#suppAdd').disabled = true;
-    try { await addDoc(collection(db, 'bests', b.id, 'notes'), { text, by: me.uid, byName: (meDoc.name || '').slice(0, 40), at: serverTimestamp() }); $('#suppTxt').value = ''; toast(t('saved')); }
-    catch (e) { onErr(e); }
-    $('#suppAdd').disabled = false;
-  };
+  bindSupp(b);
   const upd = (data) => updateDoc(doc(db, 'bests', b.id), { ...data, updatedAt: serverTimestamp(), updatedBy: me.uid }).catch(onErr);
   $('#careSel').onchange = (e) => { e.target.blur(); upd({ caretaker: e.target.value }).then(() => toast(t('saved'))); };
   document.querySelectorAll('[data-st]').forEach((el) => el.onclick = () => {
