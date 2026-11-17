@@ -237,6 +237,8 @@ with sync_playwright() as p:
     vt = pg.inner_text("#view")
     check("old card with a stored phone/LINE: not shown, no call/LINE buttons", "0912" not in vt and "chen_sm" not in vt and pg.locator("a[href^='tel:'], a[href*='line.me'], #cpLine").count() == 0)
     go(pg, "#edit/b-chen"); pg.wait_for_selector("#f_job"); pg.fill("#f_job", "學生"); pg.click("#fSave"); pg.wait_for_timeout(1200)
+    go(pg, "#new"); pg.wait_for_selector("#f_name"); check("register form: supplement (date-time, author, content) right under memo", pg.is_visible("#suppAt") and pg.is_visible("#suppBy") and pg.is_visible("#suppTxt") and pg.evaluate("document.querySelector('#f_memo').closest('label').nextElementSibling.id") == "suppBox")
+    go(pg, "#edit/b-chen"); pg.wait_for_selector("#suppTxt"); pg.fill("#suppTxt", "儲存時一起補充"); pg.click("#fSave"); pg.wait_for_timeout(1500); go(pg, "#best/b-chen"); pg.wait_for_selector("#suppList"); pg.wait_for_timeout(800); check("edit form: text typed in supplement is saved by the main Save button", "儲存時一起補充" in pg.inner_text("#suppList"))
     oc = get("/bests/b-chen")
     check("old card still saves; old phone/LINE left untouched (harmless)", oc.get("job") == "學生" and oc.get("phone") == "0912-345-678" and oc.get("line") == "chen_sm", {k: oc.get(k) for k in ("job", "phone", "line")})
     go(pg, "#home"); pg.wait_for_timeout(800)

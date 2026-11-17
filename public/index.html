@@ -583,7 +583,7 @@ function viewForm(b) {
     '<label class="f">' + esc(t('faith')) + '<select class="i" id="f_faith">' + opt(FAITHS, v.faith, 'f_') + '</select></label>' +
     '<label class="f">' + esc(t('caretaker')) + '<select class="i" id="f_caretaker"><option value="">' + esc(t('none')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (v.caretaker === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>' +
-    ta('family') + ta('memo') + (b ? suppBoxHtml(b) : '') + ta('prayer') +
+    ta('family') + ta('memo') + suppBoxHtml(b) + ta('prayer') +
     '<button class="btn wide" id="fSave">' + esc(t('save')) + '</button><button class="btn ghost wide" id="fCancel">' + esc(t('cancel')) + '</button>' +
     (b && meDoc.role === 'admin' ? '<button class="btn warn wide" id="fDel">' + esc(t('del')) + '</button>' : '') + '</div>';
 }
@@ -620,12 +620,15 @@ function bindForm(b) {
       updatedAt: serverTimestamp(), updatedBy: me.uid };
     if (!data.name) return toast(t('needName'));
     $('#fSave').disabled = true;
+    const suppText = ($('#suppTxt') ? $('#suppTxt').value.trim() : '').slice(0, 500);
+    const addSupp = (id) => suppText ? addDoc(collection(db, 'bests', id, 'notes'), { text: suppText, by: me.uid, byName: ($('#suppBy').value.trim() || meDoc.name || '').slice(0, 40), at: serverTimestamp() }) : null;
     try {
-      if (b) { await updateDoc(doc(db, 'bests', b.id), data); history.back(); }
+      if (b) { await updateDoc(doc(db, 'bests', b.id), data); await addSupp(b.id); history.back(); }
       else {
         Object.assign(data, { stage: 'first', stageHistory: [{ s: 'first', d: data.firstVisit || today(), by: me.uid }], cls: [false, false, false, false, false],
           lastContact: '', nextAction: '', nextDue: '', createdAt: serverTimestamp(), createdBy: me.uid });
         const ref = await addDoc(collection(db, 'bests'), data);
+        await addSupp(ref.id);
         location.replace('#best/' + ref.id);
       }
       toast(t('saved'));
@@ -675,11 +678,11 @@ function viewDetail(b) {
 let notesFor = null, notesUnsub = null, notesCache = [];
 const fmtDT = (d) => d ? ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : '';
 function suppBoxHtml(b) {
-  return '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div><div id="suppList">' + notesHtml(b) + '</div>' +
+  return '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div>' + (b ? '<div id="suppList">' + notesHtml(b) + '</div>' : '') +
     '<div class="suppf"><label class="f">' + esc(t('suppAt')) + '<input class="i" id="suppAt" value="' + esc(fmtDT(new Date())) + '" readonly></label>' +
     '<label class="f">' + esc(t('suppBy')) + '<input class="i" id="suppBy" maxlength="40" value="' + esc(meDoc.name || '') + '"></label>' +
     '<label class="f">' + esc(t('content')) + '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea></label></div>' +
-    '<button class="btn small" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>';
+    (b ? '<button class="btn small" id="suppAdd">' + esc(t('suppAdd')) + '</button>' : '') + '</div>';
 }
 function bindSupp(b) {
   if (notesFor !== b.id) {
