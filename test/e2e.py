@@ -202,6 +202,10 @@ with sync_playwright() as p:
     pg.goto("http://127.0.0.1:5000/#new"); pg.wait_for_selector("#f_name")
     small += pg.evaluate("[...document.querySelectorAll('input,select,textarea')].filter(e => e.type !== 'file' && parseFloat(getComputedStyle(e).fontSize) < 16).length")
     check("all inputs font-size >= 16px (no iOS zoom)", small == 0, small)
+    sa = pg.evaluate("""() => { const out = {}; for (const ss of document.styleSheets) for (const r of ss.cssRules) { const m = r.cssText.match(/safe-area-inset-[a-z]+/g); if (m) out[r.selectorText] = [...new Set(m)].join(','); }
+      out.viewport = document.querySelector('meta[name=viewport]').content; return out; }""")
+    need = {"header.top": "top", "nav.tabs": "bottom", ".app": "left", ".fab": "bottom"}
+    check("safe-area insets: viewport-fit=cover + header top, tab bar bottom, app left/right, FAB bottom", "viewport-fit=cover" in sa["viewport"] and all(v in sa.get(k, "") for k, v in need.items()) and "right" in sa.get(".app", ""), sa)
     # ---------- full bilingual tour: every screen in both languages, untranslated-text detector ----------
     DATA = ["陳小明", "林美華", "張志豪", "王淑芬", "黃建國", "吳佳蓉", "김하늘", "劉家豪", "蔡雅婷", "李姊妹", "박집사", "김목자", "周恩惠 Grace",
             "주중 LINE으로 안부", "家庭探訪，一起吃晚餐", "工作穩定", "台北市 信義區", "先生、女兒(5歲)", "女兒身體健康", "喜歡詩歌",
