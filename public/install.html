@@ -116,7 +116,7 @@ const STR = {
     svAddHome: '加入主畫面', svCancel: '取消', svAdd: '新增', svAllow: '允許來自這個來源', svInstall: '安裝', svAppName: 'BEST 關懷',
   },
 };
-let lang = localStorage.getItem('best.lang') || ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ko');
+let lang = localStorage.getItem('best.lang') || 'zh';   // owner 2026-11-17: Chinese first; Korean only when chosen
 function render() {
   const s = STR[lang];
   document.documentElement.lang = lang === 'zh' ? 'zh-Hant-TW' : 'ko';

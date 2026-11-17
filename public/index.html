@@ -140,6 +140,7 @@ nav.tabs a.on{color:var(--pri-deep)}
 .nick{font-weight:600;color:var(--soft)}
 .supp{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:2px 0 10px;display:grid;gap:8px}
 .supp .sh{font-weight:800}
+.suppf{display:grid;gap:8px;border-top:1px solid var(--line);padding-top:8px}.suppf #suppAt{color:var(--soft)}
 .supp .sn{border-top:1px solid var(--line);padding-top:6px}.supp .sn:first-child{border-top:0;padding-top:0}
 .supp .sn p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.supp .sm{font-size:14px;color:var(--soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .clogo{width:36px;height:36px;border-radius:10px;object-fit:contain;background:#fff;flex:none}
@@ -274,7 +275,7 @@ const STR = {
     openLine: '在 LINE 開啟', retry: '重試', loadFail: '無法載入資料，請檢查網路連線。', loading: '載入中…', signinCancel: '已取消登入', popupBlocked: '登入視窗被擋住了，請再點一次。',
   },
 };
-let lang = localStorage.getItem('best.lang') || ((navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : 'ko');
+let lang = localStorage.getItem('best.lang') || 'zh';   // owner 2026-11-17: Chinese first; Korean only when chosen
 const t = (k, v = {}) => (STR[lang][k] ?? k).replace(/\{(\w+)\}/g, (_, x) => v[x] ?? '');
 const MAIN_STAGES = ['first', 'welcome', 'revisit', 'class', 'group', 'settled'];
 const SIDE_STAGES = ['paused', 'unreachable'];
@@ -675,7 +676,10 @@ let notesFor = null, notesUnsub = null, notesCache = [];
 const fmtDT = (d) => d ? ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : '';
 function suppBoxHtml(b) {
   return '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div><div id="suppList">' + notesHtml(b) + '</div>' +
-    '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea><button class="btn small ghost" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>';
+    '<div class="suppf"><label class="f">' + esc(t('suppAt')) + '<input class="i" id="suppAt" value="' + esc(fmtDT(new Date())) + '" readonly></label>' +
+    '<label class="f">' + esc(t('suppBy')) + '<input class="i" id="suppBy" maxlength="40" value="' + esc(meDoc.name || '') + '"></label>' +
+    '<label class="f">' + esc(t('content')) + '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea></label></div>' +
+    '<button class="btn small" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>';
 }
 function bindSupp(b) {
   if (notesFor !== b.id) {
@@ -691,7 +695,7 @@ function bindSupp(b) {
     e.preventDefault();
     const text = $('#suppTxt').value.trim().slice(0, 500); if (!text) return $('#suppTxt').focus();
     $('#suppAdd').disabled = true;
-    try { await addDoc(collection(db, 'bests', b.id, 'notes'), { text, by: me.uid, byName: (meDoc.name || '').slice(0, 40), at: serverTimestamp() }); $('#suppTxt').value = ''; toast(t('saved')); }
+    try { await addDoc(collection(db, 'bests', b.id, 'notes'), { text, by: me.uid, byName: ($('#suppBy').value.trim() || meDoc.name || '').slice(0, 40), at: serverTimestamp() }); $('#suppTxt').value = ''; $('#suppAt').value = fmtDT(new Date()); toast(t('saved')); }
     catch (e) { onErr(e); }
     $('#suppAdd').disabled = false;
   };
@@ -700,7 +704,7 @@ function notesHtml(b) {
   const N = notesCache.filter((n) => n._b === b.id);
   if (!N.length) return '<p class="empty" style="margin:0">' + esc(t('suppNone')) + '</p>';
   return N.map((n) => '<div class="sn" data-note="' + esc(n.id) + '"><div class="sm"><span><b>' + esc(t('suppAt')) + '</b> ' + esc(fmtDT(n.atD)) + '</span><span><b>' +
-    esc(t('suppBy')) + '</b> ' + esc(careName(n.by) || n.byName) + '</span></div><p><b class="muted">' + esc(t('content')) + '</b> ' + esc(n.text) + '</p>' +
+    esc(t('suppBy')) + '</b> ' + esc(n.byName || careName(n.by)) + '</span></div><p><b class="muted">' + esc(t('content')) + '</b> ' + esc(n.text) + '</p>' +
     (n.by === me.uid || meDoc.role === 'admin' ? '<div style="text-align:right"><button class="btn small ghost" data-ndel="' + esc(n.id) + '">' + esc(t('suppDel')) + '</button></div>' : '') + '</div>').join('');
 }
 function bindNotes(b) {
