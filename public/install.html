@@ -4,7 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BEST</title>
-<link rel="manifest" href="manifest.json">
+<script>
+// Church key from the QR link (install.html?k=KEY): store it on this device and strip it from the address bar. The "open BEST" buttons
+// carry it on to the app page (needed on iPhone: Safari and the home-screen app do not share storage, so the key must be in the saved URL).
+(function () {
+  var u = new URL(location.href), k = (u.searchParams.get('k') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  // Also kept in a cookie: iOS 17.2+ copies Safari cookies into a newly added home-screen app (its localStorage starts empty).
+  var ck = (document.cookie.match(/(?:^|; )best_key=([A-Z0-9]+)/) || [])[1] || '';
+  try { if (k) localStorage.setItem('best.key', k); else { k = localStorage.getItem('best.key') || ck; if (k) localStorage.setItem('best.key', k); } } catch (e) {}
+  if (k && k !== ck) document.cookie = 'best_key=' + k + '; max-age=63072000; path=/; secure; samesite=lax';
+  window.BEST_KEY = k;
+  if (u.searchParams.has('k')) { u.searchParams.delete('k'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+  var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios) { var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.json'; document.head.appendChild(l); }
+})();
+</script>
 <meta name="theme-color" content="#E8743B">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -21,6 +35,7 @@ html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:10
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:17px;line-height:1.6}
 .wrap{max-width:560px;margin:0 auto;padding:calc(12px + env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) calc(32px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));display:grid;gap:14px}
 .top{display:flex;align-items:center;gap:10px}
+.clogo{width:40px;height:40px;border-radius:11px;object-fit:contain;background:#fff;flex:none}
 .mark{width:40px;height:40px;border-radius:11px;background:var(--pri);color:#fff;display:grid;place-items:center;font-size:13px;font-weight:900}
 h1{font-size:22px;margin:0;flex:1}
 .lang{border:2px solid var(--pri);background:var(--paper);color:var(--pri-deep);border-radius:99px;padding:6px 14px;font:inherit;font-weight:700;min-height:40px;cursor:pointer}
@@ -39,11 +54,11 @@ ol li:last-child{border-bottom:0}
 </head>
 <body>
 <div class="wrap">
-  <div class="top"><span class="mark">BEST</span><h1 data-t="title"></h1><button class="lang" id="langBtn"></button></div>
+  <div class="top"><img class="clogo" src="church-logo.png" alt="我們家教會" width="40" height="40"><span class="mark">BEST</span><h1 data-t="title"></h1><button class="lang" id="langBtn"></button></div>
   <p class="muted" data-t="intro"></p>
   <div class="card" id="ios">
     <h2>📱 iPhone</h2>
-    <ol><li><span data-t="i1"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="88" y="8" width="64" height="64" rx="15" fill="url(#gS)"/><defs><linearGradient id="gS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ac8fa"/><stop offset="1" stop-color="#1e6fd9"/></linearGradient></defs><circle cx="120" cy="40" r="23" fill="#fff"/><path d="M120 22 L126 40 L120 58 L114 40Z" fill="#ff3b30" transform="rotate(45 120 40)"/><path d="M120 40 L126 40 L120 58 L114 40Z" fill="#c7c7cc" transform="rotate(45 120 40)"/><text x="120" y="96" text-anchor="middle" font-size="15" fill="currentColor">Safari</text></svg></li><li><span data-t="i2"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="10" y="30" width="220" height="56" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><path d="M38 50 l-8 8 l8 8" stroke="#1e6fd9" stroke-width="3" fill="none"/><path d="M76 50 l8 8 l-8 8" stroke="#c7c7cc" stroke-width="3" fill="none"/><g transform="translate(120 58)"><rect x="-9" y="-6" width="18" height="18" rx="3" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><path d="M0 -14 V4 M-6 -8 L0 -14 L6 -8" stroke="#1e6fd9" stroke-width="2.5" fill="none"/></g><rect x="100" y="36" width="40" height="44" rx="10" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="154" y="50" width="16" height="16" rx="2" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><rect x="194" y="48" width="18" height="18" rx="3" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><path d="M120 20 V8" stroke="#e8743b" stroke-width="3"/><path d="M114 14 L120 22 L126 14" stroke="#e8743b" stroke-width="3" fill="none"/></svg></li><li><span data-t="i3"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="20" y="6" width="200" height="98" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><rect x="32" y="16" width="176" height="22" rx="6" fill="#fff"/><rect x="40" y="24" width="90" height="6" rx="3" fill="#d1d1d6"/><rect x="32" y="44" width="176" height="28" rx="6" fill="#fff"/><rect x="40" y="50" width="16" height="16" rx="3" fill="none" stroke="#3b2a22" stroke-width="2"/><path d="M48 54 V62 M44 58 H52" stroke="#3b2a22" stroke-width="2"/><text x="64" y="63" font-size="14" fill="#3b2a22" data-t="svAddHome"></text><rect x="28" y="40" width="184" height="36" rx="9" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="32" y="78" width="176" height="20" rx="6" fill="#fff"/><rect x="40" y="85" width="70" height="6" rx="3" fill="#d1d1d6"/></svg></li><li><span data-t="i4"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="10" y="20" width="220" height="70" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><text x="26" y="44" font-size="14" fill="#1e6fd9" data-t="svCancel"></text><text x="120" y="44" text-anchor="middle" font-size="13" font-weight="700" fill="#3b2a22" data-t="svAddHome"></text><text x="214" y="44" text-anchor="end" font-size="15" font-weight="700" fill="#1e6fd9" data-t="svAdd"></text><rect x="170" y="26" width="52" height="26" rx="8" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="26" y="58" width="28" height="28" rx="7" fill="#e8743b"/><text x="40" y="76" text-anchor="middle" font-size="8" font-weight="900" fill="#fff">BEST</text><text x="64" y="77" font-size="14" fill="#3b2a22">BEST</text></svg></li><li><span data-t="i5"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="50" y="4" width="140" height="102" rx="16" fill="#e9e3f5"/><rect x="64" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="64" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="95" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="126" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="126" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="157" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="157" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="95" y="58" width="24" height="24" rx="6" fill="#e8743b"/><text x="107" y="73" text-anchor="middle" font-size="6.5" font-weight="900" fill="#fff">BEST</text><rect x="89" y="52" width="36" height="36" rx="9" fill="none" stroke="#e8743b" stroke-width="3.5"/></svg></li></ol>
+    <ol><li><span data-t="i1"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="88" y="8" width="64" height="64" rx="15" fill="url(#gS)"/><defs><linearGradient id="gS" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5ac8fa"/><stop offset="1" stop-color="#1e6fd9"/></linearGradient></defs><circle cx="120" cy="40" r="23" fill="#fff"/><path d="M120 22 L126 40 L120 58 L114 40Z" fill="#ff3b30" transform="rotate(45 120 40)"/><path d="M120 40 L126 40 L120 58 L114 40Z" fill="#c7c7cc" transform="rotate(45 120 40)"/><text x="120" y="96" text-anchor="middle" font-size="15" fill="currentColor">Safari</text></svg></li><li><span data-t="i2"></span><a class="btn" id="openApp" href="./" data-t="openApp"></a></li><li><span data-t="i3"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="10" y="30" width="220" height="56" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><path d="M38 50 l-8 8 l8 8" stroke="#1e6fd9" stroke-width="3" fill="none"/><path d="M76 50 l8 8 l-8 8" stroke="#c7c7cc" stroke-width="3" fill="none"/><g transform="translate(120 58)"><rect x="-9" y="-6" width="18" height="18" rx="3" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><path d="M0 -14 V4 M-6 -8 L0 -14 L6 -8" stroke="#1e6fd9" stroke-width="2.5" fill="none"/></g><rect x="100" y="36" width="40" height="44" rx="10" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="154" y="50" width="16" height="16" rx="2" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><rect x="194" y="48" width="18" height="18" rx="3" fill="none" stroke="#1e6fd9" stroke-width="2.5"/><path d="M120 20 V8" stroke="#e8743b" stroke-width="3"/><path d="M114 14 L120 22 L126 14" stroke="#e8743b" stroke-width="3" fill="none"/></svg></li><li><span data-t="i4"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="20" y="6" width="200" height="98" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><rect x="32" y="16" width="176" height="22" rx="6" fill="#fff"/><rect x="40" y="24" width="90" height="6" rx="3" fill="#d1d1d6"/><rect x="32" y="44" width="176" height="28" rx="6" fill="#fff"/><rect x="40" y="50" width="16" height="16" rx="3" fill="none" stroke="#3b2a22" stroke-width="2"/><path d="M48 54 V62 M44 58 H52" stroke="#3b2a22" stroke-width="2"/><text x="64" y="63" font-size="14" fill="#3b2a22" data-t="svAddHome"></text><rect x="28" y="40" width="184" height="36" rx="9" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="32" y="78" width="176" height="20" rx="6" fill="#fff"/><rect x="40" y="85" width="70" height="6" rx="3" fill="#d1d1d6"/></svg></li><li><span data-t="i5"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="10" y="20" width="220" height="70" rx="12" fill="#f2f2f7" stroke="#d1d1d6"/><text x="26" y="44" font-size="14" fill="#1e6fd9" data-t="svCancel"></text><text x="120" y="44" text-anchor="middle" font-size="13" font-weight="700" fill="#3b2a22" data-t="svAddHome"></text><text x="214" y="44" text-anchor="end" font-size="15" font-weight="700" fill="#1e6fd9" data-t="svAdd"></text><rect x="170" y="26" width="52" height="26" rx="8" fill="none" stroke="#e8743b" stroke-width="3.5"/><rect x="26" y="58" width="28" height="28" rx="7" fill="#e8743b"/><text x="40" y="76" text-anchor="middle" font-size="8" font-weight="900" fill="#fff">BEST</text><text x="64" y="77" font-size="14" fill="#3b2a22">BEST</text></svg></li><li><span data-t="i6"></span><svg class="ill" viewBox="0 0 240 110" role="img" aria-hidden="true"><rect x="50" y="4" width="140" height="102" rx="16" fill="#e9e3f5"/><rect x="64" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="64" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="95" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="126" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="126" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="157" y="16" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="157" y="58" width="24" height="24" rx="6" fill="#c9bfe0"/><rect x="95" y="58" width="24" height="24" rx="6" fill="#e8743b"/><text x="107" y="73" text-anchor="middle" font-size="6.5" font-weight="900" fill="#fff">BEST</text><rect x="89" y="52" width="36" height="36" rx="9" fill="none" stroke="#e8743b" stroke-width="3.5"/></svg></li></ol>
     <p class="note" data-t="iNote"></p>
   </div>
   <div class="card" id="android">
@@ -54,7 +69,7 @@ ol li:last-child{border-bottom:0}
     <p class="muted" data-t="aAlt"></p>
   </div>
   <div class="card"><h2 data-t="firstTitle"></h2><ol><li data-t="f1"></li><li data-t="f2"></li><li data-t="f3"></li></ol></div>
-  <a class="btn ghost" href="./" data-t="back"></a>
+  <a class="btn ghost" id="back" href="./" data-t="back"></a>
 </div>
 <script>
 // APK download link: set after the APK is published (Firebase Spark Hosting cannot serve .apk files).
@@ -62,40 +77,42 @@ const APK_URL = 'https://github.com/dosun0691-sketch/best-app/releases/latest/do
 const STR = {
   ko: {
     langBtn: '中文', title: 'BEST 돌봄 설치 방법', back: '← BEST 돌봄 열기',
-    intro: '교회 섬김이용 앱입니다. 휴대폰 홈 화면에 설치해 두면 앱처럼 바로 열립니다.',
-    i1: '이 페이지를 꼭 Safari로 여세요. (LINE 등 다른 앱 안에서 열었다면 「Safari로 열기」를 누르세요.)',
-    i2: '화면 아래(또는 위)의 공유 버튼 <span class="k">⬆︎</span> 을 누릅니다.',
-    i3: '메뉴를 내려 「홈 화면에 추가」를 누릅니다.',
-    i4: '이름이 「BEST」인지 확인하고 오른쪽 위 「추가」를 누릅니다.',
-    i5: '홈 화면에 생긴 BEST 아이콘을 눌러 엽니다.',
-    iNote: 'App Store에는 없습니다. 위 방법으로 설치한 아이콘에서 열어야 로그인이 유지됩니다.',
+    intro: '교회 동역자 전용 앱입니다. 로그인이나 비밀번호 없이, 교회 QR코드로 연 휴대폰에서 바로 씁니다. 홈 화면에 설치해 두면 앱처럼 열립니다.',
+    i1: '교회 QR코드를 iPhone 카메라로 찍어 이 페이지를 Safari로 엽니다. (LINE 등 다른 앱 안에서 열렸다면 「Safari로 열기」를 누르세요.)',
+    i2: '아래 「BEST 열기」 버튼을 누릅니다. BEST 첫 화면이 열립니다.', openApp: 'BEST 열기',
+    i3: '열린 BEST 화면에서, 화면 아래(또는 위)의 공유 버튼 <span class="k">⬆︎</span> 을 누릅니다.',
+    i4: '메뉴를 내려 「홈 화면에 추가」를 누릅니다.',
+    i5: '이름이 「BEST」인지 확인하고 오른쪽 위 「추가」를 누릅니다.',
+    i6: '홈 화면에 생긴 BEST 아이콘을 눌러 엽니다. 로그인 없이 바로 열립니다.',
+    iNote: 'App Store에는 없습니다. 꼭 「BEST 열기」로 연 화면에서 홈 화면에 추가하세요. 아이콘을 눌렀는데 「교회 QR코드로 열어 주세요」가 나오면, 그 아이콘을 지우고 QR코드를 다시 찍어 1번부터 하세요.',
     a1: '아래 버튼(또는 교회 관리자가 보내 준 링크)으로 APK 파일을 내려받습니다.',
     a2: '내려받은 파일을 엽니다. 「출처를 알 수 없는 앱」 경고가 나오면 「설정」에서 이 출처 허용을 켭니다.',
     a3: '「설치」를 누릅니다.',
-    a4: '앱 목록의 「BEST 돌봄」을 눌러 엽니다.',
+    a4: '앱 목록의 「BEST 돌봄」을 눌러 엽니다. 앱에 「교회 QR코드로 열어 주세요」가 나오면, 교회 QR코드를 카메라로 한 번 더 찍으세요 — 설치된 앱에서 바로 열립니다.',
     apk: 'Android 앱(APK) 내려받기', apkNone: 'APK 파일은 교회 관리자에게 받으세요.',
     aAlt: 'APK 없이 쓰려면: Chrome으로 이 주소를 열고 오른쪽 위 ⋮ → 「홈 화면에 추가」를 누르세요.',
-    firstTitle: '처음 열었을 때', f1: '「Google 계정으로 로그인」을 누릅니다.', f2: '처음 한 번만 교회 초대 코드(8자리)를 넣습니다. 코드는 목사님이나 관리자에게 받으세요.',
-    f3: '내 이름을 확인하고 「시작하기」를 누르면 끝입니다.',
+    firstTitle: '처음 열었을 때', f1: '로그인·비밀번호가 없습니다. 교회 QR코드로 연 휴대폰은 바로 모든 BEST 기록을 보고 고칠 수 있습니다.', f2: '처음 한 번 「내 이름」을 물어봅니다(선택). 비워 두면 「동역자」로 보이고, 나중에 더보기에서 바꿀 수 있습니다.',
+    f3: '휴대폰을 바꾸거나 앱 데이터를 지웠다면 교회 QR코드를 다시 찍으면 됩니다. (QR코드 대신 교회 코드를 직접 넣을 수도 있습니다.)',
     svAddHome: '홈 화면에 추가', svCancel: '취소', svAdd: '추가', svAllow: '이 출처 허용', svInstall: '설치', svAppName: 'BEST 돌봄',
   },
   zh: {
     langBtn: '한국어', title: 'BEST 關懷 安裝方法', back: '← 開啟 BEST 關懷',
-    intro: '這是教會同工專用的 App。安裝到手機主畫面後，就能像 App 一樣直接開啟。',
-    i1: '請一定要用 Safari 開啟這個頁面。（如果是在 LINE 等其他 App 裡開啟，請點「用 Safari 開啟」。）',
-    i2: '點畫面下方（或上方）的分享按鈕 <span class="k">⬆︎</span>。',
-    i3: '往下滑，點「加入主畫面」。',
-    i4: '確認名稱是「BEST」，再點右上角「新增」。',
-    i5: '點主畫面上的 BEST 圖示開啟。',
-    iNote: 'App Store 上沒有這個 App。請用上面的方法安裝，並從主畫面圖示開啟，才能保持登入。',
+    intro: '這是教會同工專用的 App。不需要登入或密碼，用教會 QR 碼開啟過的手機就能直接使用。安裝到主畫面後，就能像 App 一樣開啟。',
+    i1: '用 iPhone 相機掃描教會的 QR 碼，用 Safari 開啟這個頁面。（如果是在 LINE 等其他 App 裡開啟，請點「用 Safari 開啟」。）',
+    i2: '點下面的「開啟 BEST」按鈕，會開啟 BEST 首頁。', openApp: '開啟 BEST',
+    i3: '在開啟的 BEST 畫面，點畫面下方（或上方）的分享按鈕 <span class="k">⬆︎</span>。',
+    i4: '往下滑，點「加入主畫面」。',
+    i5: '確認名稱是「BEST」，再點右上角「新增」。',
+    i6: '點主畫面上的 BEST 圖示開啟。不需要登入就能直接使用。',
+    iNote: 'App Store 上沒有這個 App。請一定要在「開啟 BEST」打開的畫面加入主畫面。如果點圖示後出現「請用教會的 QR 碼開啟」，請刪除那個圖示，重新掃描 QR 碼，從第 1 步再做一次。',
     a1: '用下面的按鈕（或教會管理者傳給您的連結）下載 APK 檔案。',
     a2: '開啟下載的檔案。如果出現「不明來源的應用程式」警告，請到「設定」允許此來源。',
     a3: '點「安裝」。',
-    a4: '在 App 列表中點「BEST 關懷」開啟。',
+    a4: '在 App 列表中點「BEST 關懷」開啟。如果 App 顯示「請用教會的 QR 碼開啟」，請用相機再掃描一次教會的 QR 碼——會直接在已安裝的 App 中開啟。',
     apk: '下載 Android App（APK）', apkNone: 'APK 檔案請向教會管理者索取。',
     aAlt: '不想安裝 APK：用 Chrome 開啟這個網址，點右上角 ⋮ →「加到主畫面」。',
-    firstTitle: '第一次開啟時', f1: '點「用 Google 帳號登入」。', f2: '只有第一次需要輸入教會邀請碼（8 位）。邀請碼請向牧師或管理者索取。',
-    f3: '確認自己的名字，點「開始使用」就完成了。',
+    firstTitle: '第一次開啟時', f1: '不需要登入或密碼。用教會 QR 碼開啟過的手機，就能查看和修改所有 BEST 紀錄。', f2: '第一次會詢問「我的名字」（可不填）。不填就顯示「同工」，之後可以在「更多」修改。',
+    f3: '換手機或清除 App 資料後，只要重新掃描教會的 QR 碼就可以。（也可以不用 QR 碼，直接輸入教會代碼。）',
     svAddHome: '加入主畫面', svCancel: '取消', svAdd: '新增', svAllow: '允許來自這個來源', svInstall: '安裝', svAppName: 'BEST 關懷',
   },
 };
@@ -109,6 +126,8 @@ function render() {
   const apk = document.getElementById('apkBtn');
   apk.hidden = !APK_URL; if (APK_URL) apk.href = APK_URL;
   document.getElementById('apkNone').hidden = !!APK_URL;
+  const appUrl = './' + (window.BEST_KEY ? '?k=' + encodeURIComponent(window.BEST_KEY) : '');   // iPhone: the saved home-screen URL must carry the key
+  document.getElementById('openApp').href = appUrl; document.getElementById('back').href = appUrl;
 }
 document.getElementById('langBtn').onclick = () => { lang = lang === 'ko' ? 'zh' : 'ko'; localStorage.setItem('best.lang', lang); render(); };
 render();

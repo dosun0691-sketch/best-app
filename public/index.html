@@ -4,7 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>BEST</title>
-<link rel="manifest" href="manifest.json">
+<script>
+// Church key from the QR link (?k=KEY): store it, then strip it from the address bar.
+// iPhone Safari (not yet on the home screen) is the exception: "Add to Home Screen" saves the CURRENT page URL when the page has no web app
+// manifest, and the home-screen app has its OWN storage - so there the key stays in the URL (and no manifest is linked) until the app is added.
+(function () {
+  var u = new URL(location.href), k = (u.searchParams.get('k') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var sa = navigator.standalone === true || matchMedia('(display-mode: standalone)').matches;
+  // Also kept in a cookie: iOS 17.2+ copies Safari cookies into a newly added home-screen app (its localStorage starts empty).
+  var ck = (document.cookie.match(/(?:^|; )best_key=([A-Z0-9]+)/) || [])[1] || '';
+  try { if (k) localStorage.setItem('best.key', k); else { k = localStorage.getItem('best.key') || ck; if (k) localStorage.setItem('best.key', k); } } catch (e) {}
+  if (k && k !== ck) document.cookie = 'best_key=' + k + '; max-age=63072000; path=/; secure; samesite=lax';
+  if (ios && !sa) { if (k && u.searchParams.get('k') !== k) { u.searchParams.set('k', k); history.replaceState(null, '', u.pathname + u.search + u.hash); } }
+  else if (u.searchParams.has('k')) { u.searchParams.delete('k'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+  if (!ios) { var l = document.createElement('link'); l.rel = 'manifest'; l.href = 'manifest.json'; document.head.appendChild(l); }
+})();
+</script>
 <meta name="theme-color" content="#E8743B">
 <link rel="icon" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-180.png">
@@ -92,7 +108,8 @@ nav.tabs a.on{color:var(--pri-deep)}
 .inner .fab{display:none}
 /* detail */
 .hero{display:flex;gap:14px;align-items:center}
-.hero .ava{width:84px;height:84px;font-size:30px}
+.hero{flex-wrap:wrap}
+.hero .ava{width:168px;height:168px;font-size:56px}
 .hero .nm{font-size:24px;font-weight:800}
 .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:16px}
 .kv dt{color:var(--soft);font-size:14px;padding-top:2px}
@@ -118,7 +135,16 @@ nav.tabs a.on{color:var(--pri-deep)}
 .att button.y{border-color:var(--ok);background:var(--ok-bg)}
 .att .ck{margin-left:auto;font-size:24px;width:32px;text-align:center}
 .photo-pick{display:flex;gap:12px;align-items:center}
-.photo-pick .ava{width:72px;height:72px}
+.photo-pick{flex-wrap:wrap}
+.photo-pick .ava{width:136px;height:136px;font-size:44px}
+.nick{font-weight:600;color:var(--soft)}
+.supp{border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin:2px 0 10px;display:grid;gap:8px}
+.supp .sh{font-weight:800}
+.supp .sn{border-top:1px solid var(--line);padding-top:6px}.supp .sn:first-child{border-top:0;padding-top:0}
+.supp .sn p{margin:0;white-space:pre-wrap;overflow-wrap:anywhere}.supp .sm{font-size:14px;color:var(--soft);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.clogo{width:36px;height:36px;border-radius:10px;object-fit:contain;background:#fff;flex:none}
+.biglogo{width:150px;height:150px;border-radius:30px;object-fit:contain;background:#fff;display:block;margin:0 auto 14px;box-shadow:0 2px 12px rgba(120,70,40,.15)}
+.codebox{display:grid;gap:10px;margin-top:14px;text-align:left}
 .center{min-height:70vh;display:grid;place-items:center;text-align:center;padding:24px}
 .center .big{width:110px;height:110px;border-radius:30px;background:var(--pri);color:#fff;display:grid;place-items:center;font-size:32px;font-weight:900;margin:0 auto 14px;letter-spacing:1px}
 .toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#2b221d;color:#fff;padding:10px 18px;border-radius:12px;z-index:20;font-size:15px;max-width:90vw}
@@ -135,7 +161,7 @@ nav.tabs a.on{color:var(--pri-deep)}
 <div class="app" id="app">
   <header class="top">
     <button class="back" id="backBtn" hidden aria-label="back">‹</button>
-    <div class="brand"><span class="mark">BEST</span><span id="brandTxt"></span></div>
+    <div class="brand"><img class="clogo" src="church-logo.png" alt="我們家教會" width="36" height="36"><span class="mark">BEST</span><span id="brandTxt"></span></div>
     <div class="sp"></div>
     <button class="lang" id="langBtn"></button>
   </header>
@@ -150,7 +176,7 @@ nav.tabs a.on{color:var(--pri-deep)}
 </div>
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, connectAuthEmulator, signInWithCredential }
+import { getAuth, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, connectAuthEmulator, signInWithCredential, signInAnonymously }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { getFirestore, initializeFirestore, connectFirestoreEmulator, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc, collection, onSnapshot, query, orderBy, limit,
   writeBatch, serverTimestamp, arrayUnion, arrayRemove, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
@@ -171,6 +197,7 @@ const db = LOCAL ? initializeFirestore(fbApp, { experimentalForceLongPolling: tr
 if (LOCAL) {   // local development / screenshots only: Firebase emulators
   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  window.__me = () => auth.currentUser && { uid: auth.currentUser.uid, anon: auth.currentUser.isAnonymous };
   window.__emuSignIn = (sub, name) => signInWithCredential(auth, GoogleAuthProvider.credential(JSON.stringify({ sub, email: sub + '@example.com', email_verified: true, name })));
 }
 
@@ -178,19 +205,22 @@ if (LOCAL) {   // local development / screenshots only: Firebase emulators
 const STR = {
   ko: {
     brand: 'BEST 돌봄', langBtn: '中文', tabHome: '오늘', tabList: 'BEST 목록', tabAtt: '주일 출석', tabMore: '더보기',
-    signinTitle: 'BEST 돌봄', signinSub: '교회 BEST(새로 오신 분)를 함께 돌보는 섬김이용 앱입니다.\n교회 직분자·BEST팀만 사용할 수 있습니다.',
-    signinBtn: 'Google 계정으로 로그인', signinFail: '로그인하지 못했습니다',
-    joinTitle: '교회 초대 코드 입력', joinSub: '처음 한 번만 필요합니다. 목사님 또는 관리자에게 받은 8자리 코드를 입력하세요.',
-    joinName: '내 이름 (다른 섬김이에게 보이는 이름)', joinCode: '초대 코드', joinBtn: '시작하기', joinBad: '초대 코드가 맞지 않습니다',
-    inactiveTitle: '사용이 중지된 계정입니다', inactiveSub: '관리자에게 문의하세요.', signout: '로그아웃',
+    noKeyTitle: '교회 QR코드로 열어 주세요', noKeySub: '교회 BEST(새로 오신 분)를 함께 돌보는 동역자 전용 앱입니다.\n교회에서 받은 QR코드를 휴대폰 카메라로 한 번 찍으면 바로 열립니다. 로그인이나 비밀번호는 필요 없습니다.',
+    camHint: '📷 카메라 앱을 열고 QR코드에 비추면 나오는 링크를 누르세요.', codeLink: '교회 코드 직접 입력', codeLabel: '교회 코드', codeBtn: '열기',
+    codeBad: '교회 코드가 맞지 않습니다. 교회의 새 QR코드를 다시 찍어 주세요.', starting: '여는 중…', defName: '동역자',
+    adminLogin: '관리자 로그인 (Google)', signinFail: '로그인하지 못했습니다',
+    askName: '내 이름 (선택)', askNameSub: '연락 기록에 쓰는 이름입니다. 비워 두면 「동역자」로 보입니다. 나중에 더보기에서 바꿀 수 있습니다.', skip: '건너뛰기',
+    iosAddTip: '홈 화면에 추가해 두세요: 아래 공유 버튼 ⬆︎ → 「홈 화면에 추가」 → 「추가」. 그다음부터는 홈 화면 아이콘으로 여세요.', close: '닫기',
+    nick: '별명', supp: '보충', suppAt: '보충 일시', suppBy: '보충자', suppAdd: '+ 보충 추가', suppPh: '덧붙일 내용 (최대 500자)', suppNone: '아직 보충이 없습니다', suppDel: '삭제', suppDelAsk: '이 보충을 삭제할까요?',
+    inactiveTitle: '사용이 중지된 기기입니다', inactiveSub: '관리자에게 문의하세요.', signout: '로그아웃',
     newBest: '+ BEST 등록', editBest: 'BEST 정보 수정', regTitle: 'BEST 등록',
     todayNeed: '오늘 돌봐야 할 BEST', noContact: '아직 첫 연락 전 (첫 방문 후 2일 안에 연락)', absent: '주일 2번 이상 연속 결석',
     dueActions: '해야 할 일 (오늘까지)', allGood: '지금 돌봐야 할 BEST가 없습니다 🙏', overdue: '{n}일 지남', dueToday: '오늘', daysLeft: '{n}일 남음',
     absentN: '{n}주 연속 결석', done: '완료', statActive: '돌봄 중 BEST', statNew: '이번 달 새 BEST', statRet: '8주 정착률',
     retHint: '첫 방문 8주 이상 지난 BEST 중, 최근 4주 출석 또는 소그룹·정착 단계인 비율', byStage: '단계별 BEST',
-    search: '이름·전화·LINE 검색', all: '전체', mine: '내 담당', anyCare: '섬김이 전체', noCare: '섬김이 미정', noResult: 'BEST가 없습니다',
-    name: '이름', photo: '사진', photoPick: '사진 선택', photoDel: '사진 삭제', gender: '성별', age: '나이대', phone: '전화', line: 'LINE ID',
-    area: '사는 곳', firstVisit: '첫 방문일', invitedBy: '인도자', faith: '신앙 배경', family: '가족', prayer: '기도 제목', memo: '메모',
+    search: '이름·별명 검색', all: '전체', mine: '내 담당', anyCare: '섬김이 전체', noCare: '섬김이 미정', noResult: 'BEST가 없습니다',
+    name: '이름', photo: '사진', photoPick: '사진 선택', photoDel: '사진 삭제', gender: '성별', age: '나이대', job: '직업', school: '학교(과)', grade: '학년',
+    area: '사는 곳', firstVisit: '첫 방문일', invitedBy: '인도자', faith: '신앙 배경', family: '가족', prayer: '기도 제목', memo: '기억해 둘 일',
     caretaker: '섬김이', none: '— 선택 안 함 —', save: '저장', cancel: '취소', del: 'BEST 삭제', delAsk: '이 BEST와 모든 기록을 삭제할까요? 되돌릴 수 없습니다.',
     saved: '저장했습니다', needName: '이름을 입력하세요', stage: '단계', stageHist: '단계 기록', moveTo: '단계 바꾸기',
     clsTitle: 'BEST반 (5주)', week: '{n}주', attHist: '주일 출석 (최근 8주)', attNone: '아직 출석 기록이 없습니다',
@@ -198,31 +228,34 @@ const STR = {
     noLogs: '아직 기록이 없습니다', lastContact: '마지막 연락', call: '전화 걸기', copyLine: 'LINE ID 복사', copied: '복사했습니다',
     attTitle: '주일 출석 체크', attSub: '이름을 누르면 출석으로 표시됩니다 (바로 저장).', attDay: '주일 날짜', present: '출석 {n}명',
     moreTitle: '더보기', me: '내 정보', myName: '내 이름', rename: '이름 바꾸기', staffList: '섬김이 명단', admin: '관리자', deactivate: '사용 중지',
-    activate: '다시 사용', inactive: '중지됨', inviteTitle: '초대 코드 바꾸기', inviteSub: '새 코드를 만들면 이전 코드로는 더 이상 가입할 수 없습니다. 새 코드는 지금 한 번만 보입니다.',
-    inviteNew: '새 코드 만들기', inviteShown: '새 초대 코드: {c}', exportCsv: 'CSV로 내보내기 (백업)', adminOnly: '관리자 전용',
+    activate: '다시 사용', inactive: '중지됨', inviteTitle: '교회 코드(QR) 바꾸기', inviteSub: '새 코드를 만들면 이전 QR코드로는 새 기기가 더 이상 들어올 수 없습니다(이미 쓰고 있는 기기는 그대로 사용). 새 코드와 링크는 지금 한 번만 보이니, 이 링크로 새 QR코드를 만드세요.',
+    inviteNew: '새 코드 만들기', inviteShown: '새 교회 코드:', exportCsv: 'CSV로 내보내기 (백업)', adminOnly: '관리자 전용',
     m_phone: '전화', m_line: 'LINE', m_visit: '심방', m_church: '교회에서 만남', m_other: '기타',
     g_m: '남', g_f: '여', a_child: '어린이', a_teen: '청소년', a_20: '20대', a_30: '30대', a_40: '40대', a_50: '50대', a_60: '60대 이상',
     f_first: '처음 교회에 옴', f_moved: '다른 교회에서 옮김', f_returning: '다시 교회로 돌아옴',
     s_first: '첫 방문', s_welcome: '환영 연락', s_revisit: '재방문', s_class: 'BEST반', s_group: '소그룹 연결', s_settled: '정착(등록교인)',
     s_paused: '보류', s_unreachable: '연락안됨', sideStates: '기타 상태', by: '기록', err: '오류가 났습니다. 다시 시도하세요.', offline: '인터넷 연결을 확인하고 다시 시도하세요.', errPerm: '권한이 없습니다. 관리자에게 문의하세요.',
-    install: '설치 방법 (iPhone · Android)', inAppWarn: 'LINE 등 앱 안의 브라우저에서는 Google 로그인이 되지 않습니다. 오른쪽 위 메뉴에서 「Safari로 열기」 또는 「Chrome으로 열기」를 누르세요.',
+    install: '설치 방법 (iPhone · Android)', inAppWarn: 'LINE 등 앱 안의 브라우저에서는 Google 로그인이 되지 않습니다. 오른쪽 위 메뉴에서 「Safari로 열기」 또는 「Chrome으로 열기」를 누르세요.', anonMe: '이 기기는 교회 QR코드로 연결되어 있습니다.',
     openLine: 'LINE에서 열기', retry: '다시 시도', loadFail: '정보를 불러오지 못했습니다. 인터넷 연결을 확인하세요.', loading: '불러오는 중…', signinCancel: '로그인을 취소했습니다', popupBlocked: '로그인 창이 막혔습니다. 다시 눌러 주세요.',
   },
   zh: {
     brand: 'BEST 關懷', langBtn: '한국어', tabHome: '今天', tabList: 'BEST 名單', tabAtt: '主日出席', tabMore: '更多',
-    signinTitle: 'BEST 關懷', signinSub: '一起關懷教會 BEST（新來的朋友）的同工專用 App。\n僅限教會同工與 BEST 團隊使用。',
-    signinBtn: '用 Google 帳號登入', signinFail: '無法登入',
-    joinTitle: '輸入教會邀請碼', joinSub: '只需要第一次輸入。請輸入牧師或管理者給您的 8 位邀請碼。',
-    joinName: '我的名字（其他同工看到的名字）', joinCode: '邀請碼', joinBtn: '開始使用', joinBad: '邀請碼不正確',
-    inactiveTitle: '此帳號已停用', inactiveSub: '請聯絡管理者。', signout: '登出',
+    noKeyTitle: '請用教會的 QR 碼開啟', noKeySub: '一起關懷教會 BEST（新來的朋友）的同工專用 App。\n用手機相機掃描一次教會給您的 QR 碼，就能直接開啟。不需要登入，也不需要密碼。',
+    camHint: '📷 打開相機對準 QR 碼，再點出現的連結。', codeLink: '直接輸入教會代碼', codeLabel: '教會代碼', codeBtn: '開啟',
+    codeBad: '教會代碼不正確。請重新掃描教會新的 QR 碼。', starting: '開啟中…', defName: '同工',
+    adminLogin: '管理者登入（Google）', signinFail: '無法登入',
+    askName: '我的名字（可不填）', askNameSub: '這是聯繫紀錄上顯示的名字。不填就顯示「同工」。之後可以在「更多」修改。', skip: '略過',
+    iosAddTip: '請加入主畫面：點下方分享按鈕 ⬆︎ →「加入主畫面」→「新增」。之後請從主畫面圖示開啟。', close: '關閉',
+    nick: '暱稱', supp: '補充', suppAt: '補充日期時間', suppBy: '補充者', suppAdd: '+ 新增補充', suppPh: '要補充的內容（最多 500 字）', suppNone: '還沒有補充', suppDel: '刪除', suppDelAsk: '確定刪除這則補充嗎？',
+    inactiveTitle: '此裝置已停用', inactiveSub: '請聯絡管理者。', signout: '登出',
     newBest: '+ 新BEST 登記', editBest: '修改 BEST 資料', regTitle: 'BEST 登記',
     todayNeed: '今天需要關懷的 BEST', noContact: '還沒有第一次聯繫（初次來訪後 2 天內聯繫）', absent: '連續 2 次以上主日缺席',
     dueActions: '待辦事項（到今天）', allGood: '目前沒有需要關懷的 BEST 🙏', overdue: '已過 {n} 天', dueToday: '今天', daysLeft: '還有 {n} 天',
     absentN: '連續缺席 {n} 週', done: '完成', statActive: '關懷中 BEST', statNew: '本月新BEST', statRet: '8 週定著率',
     retHint: '初次來訪已滿 8 週的 BEST 中，最近 4 週有出席或已在連結小組／定著階段的比例', byStage: '各階段 BEST',
-    search: '搜尋姓名・電話・LINE', all: '全部', mine: '我負責的', anyCare: '所有陪伴者', noCare: '未指定陪伴者', noResult: '沒有 BEST',
-    name: '姓名', photo: '照片', photoPick: '選擇照片', photoDel: '刪除照片', gender: '性別', age: '年齡層', phone: '電話', line: 'LINE ID',
-    area: '居住地區', firstVisit: '初次來訪日', invitedBy: '邀請人', faith: '信仰背景', family: '家人', prayer: '代禱事項', memo: '備註',
+    search: '搜尋姓名・暱稱', all: '全部', mine: '我負責的', anyCare: '所有陪伴者', noCare: '未指定陪伴者', noResult: '沒有 BEST',
+    name: '姓名', photo: '照片', photoPick: '選擇照片', photoDel: '刪除照片', gender: '性別', age: '年齡層', job: '職業', school: '學校(科系)', grade: '年級',
+    area: '居住地區', firstVisit: '初次來訪日', invitedBy: '邀請人', faith: '信仰背景', family: '家人', prayer: '代禱事項', memo: '值得記住的事項',
     caretaker: '陪伴者', none: '— 未選擇 —', save: '儲存', cancel: '取消', del: '刪除 BEST', delAsk: '確定刪除這位 BEST 和所有紀錄嗎？無法復原。',
     saved: '已儲存', needName: '請輸入姓名', stage: '階段', stageHist: '階段紀錄', moveTo: '變更階段',
     clsTitle: 'BEST班（5 週）', week: '第{n}週', attHist: '主日出席（最近 8 週）', attNone: '還沒有出席紀錄',
@@ -230,14 +263,14 @@ const STR = {
     noLogs: '還沒有紀錄', lastContact: '最後聯繫', call: '打電話', copyLine: '複製 LINE ID', copied: '已複製',
     attTitle: '主日出席點名', attSub: '點姓名即標記為出席（立即儲存）。', attDay: '主日日期', present: '出席 {n} 人',
     moreTitle: '更多', me: '我的資料', myName: '我的名字', rename: '修改名字', staffList: '同工名單', admin: '管理者', deactivate: '停用',
-    activate: '重新啟用', inactive: '已停用', inviteTitle: '更換邀請碼', inviteSub: '產生新邀請碼後，舊邀請碼就不能再加入。新邀請碼只會顯示這一次。',
-    inviteNew: '產生新邀請碼', inviteShown: '新邀請碼：{c}', exportCsv: '匯出 CSV（備份）', adminOnly: '僅限管理者',
+    activate: '重新啟用', inactive: '已停用', inviteTitle: '更換教會代碼（QR 碼）', inviteSub: '產生新代碼後，新的裝置就不能再用舊 QR 碼加入（已經在使用的裝置照常使用）。新代碼和連結只會顯示這一次，請用這個連結製作新的 QR 碼。',
+    inviteNew: '產生新代碼', inviteShown: '新的教會代碼：', exportCsv: '匯出 CSV（備份）', adminOnly: '僅限管理者',
     m_phone: '電話', m_line: 'LINE', m_visit: '探訪', m_church: '在教會見面', m_other: '其他',
     g_m: '男', g_f: '女', a_child: '兒童', a_teen: '青少年', a_20: '20多歲', a_30: '30多歲', a_40: '40多歲', a_50: '50多歲', a_60: '60歲以上',
     f_first: '第一次來教會', f_moved: '從其他教會轉來', f_returning: '重新回到教會',
     s_first: '初次來訪', s_welcome: '歡迎聯繫', s_revisit: '再次來訪', s_class: 'BEST班', s_group: '連結小組', s_settled: '定著(登記會友)',
     s_paused: '暫停', s_unreachable: '聯絡不上', sideStates: '其他狀態', by: '紀錄', err: '發生錯誤，請再試一次。', offline: '請檢查網路連線後再試一次。', errPerm: '沒有權限，請聯絡管理者。',
-    install: '安裝方法（iPhone・Android）', inAppWarn: '在 LINE 等 App 內建的瀏覽器中無法用 Google 登入。請點右上角選單，選擇「用 Safari 開啟」或「用 Chrome 開啟」。',
+    install: '安裝方法（iPhone・Android）', inAppWarn: '在 LINE 等 App 內建的瀏覽器中無法用 Google 登入。請點右上角選單，選擇「用 Safari 開啟」或「用 Chrome 開啟」。', anonMe: '這台裝置已用教會 QR 碼連結。',
     openLine: '在 LINE 開啟', retry: '重試', loadFail: '無法載入資料，請檢查網路連線。', loading: '載入中…', signinCancel: '已取消登入', popupBlocked: '登入視窗被擋住了，請再點一次。',
   },
 };
@@ -275,18 +308,50 @@ let attDay = lastSunday();
 let logUnsub = null, logsCache = [];
 
 /* ---------- auth flow ---------- */
-getRedirectResult(auth).catch(onSignInErr);
-let meErr = false;
+// No passwords: the church QR link carries the church key (stored by the head script as best.key). A device with the key signs in
+// anonymously and joins once (staffKeys/{uid}.code must equal config/invite.code - checked by the rules). Admin = Google sign-in (More tab).
+const KEY = () => { try { return localStorage.getItem('best.key') || ''; } catch (e) { return ''; } };
+const redirectDone = getRedirectResult(auth).catch(onSignInErr);
+let meErr = false, joinErr = false, anonBusy = false;
+async function startAnon() {
+  await redirectDone; if (auth.currentUser || anonBusy) return;
+  anonBusy = true; render();
+  try { await signInAnonymously(auth); } catch (e) { anonBusy = false; console.error(e); meErr = true; render(); return; }
+  anonBusy = false;
+}
+async function autoJoin() {
+  const code = KEY(); if (!code || !me) return false;
+  const name = (localStorage.getItem('best.name') || '').trim().slice(0, 40) || t('defName');
+  try {
+    const b = writeBatch(db);
+    b.set(doc(db, 'staffKeys', me.uid), { code });
+    b.set(doc(db, 'staff', me.uid), { name, active: true, role: 'staff', joinedAt: serverTimestamp() });
+    await b.commit();
+    meDoc = { name, active: true, role: 'staff' }; joinErr = false;
+    if (!localStorage.getItem('best.name')) localStorage.setItem('best.askName', '1');
+    return true;
+  } catch (e) {
+    if (String(e.code || '').includes('permission')) console.warn('church key not accepted'); else console.error(e);
+    if (String(e.code || '').includes('permission')) { localStorage.removeItem('best.key'); document.cookie = 'best_key=; max-age=0; path=/'; joinErr = true; } else meErr = true;   // wrong / old key
+    return false;
+  }
+}
 async function loadMe(u) {   // retry: a transient network error must not look like "not joined yet"
   for (let i = 0; ; i++) {
     try { const snap = await getDoc(doc(db, 'staff', u.uid)); return snap.exists() ? snap.data() : null; }
     catch (e) { if (i >= 5) throw e; await new Promise((r) => setTimeout(r, 700 * (i + 1))); }
   }
 }
+let authSeq = 0;   // anonymous -> Google (admin) switches fire two callbacks; a slower, older one must not overwrite the newer state
 onAuthStateChanged(auth, async (u) => {
+  const seq = ++authSeq;
   unsubs.forEach((f) => f()); unsubs = []; me = u; meDoc = null; meErr = false;
-  if (!u) return render();
-  try { meDoc = await loadMe(u); } catch (e) { console.error(e); meErr = true; }
+  if (!u) { if (KEY()) startAnon(); return render(); }
+  let d = null, err = false;
+  try { d = await loadMe(u); } catch (e) { console.error(e); err = true; }
+  if (seq !== authSeq) return;
+  meDoc = d; meErr = err;
+  if (!meDoc && !meErr && KEY()) { await autoJoin(); if (seq !== authSeq) return; }
   if (meDoc && meDoc.active) startData();
   render();
 });
@@ -323,7 +388,7 @@ function errMsg(e) {
 }
 function onErr(e) { console.error(e); toast(errMsg(e)); }
 let rerenderTimer = 0;
-function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { if (!document.activeElement || !document.activeElement.matches('input,textarea,select')) render(); else if (route().name === 'home' || route().name === 'att') render(); }, 30); }
+function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea,select')) render(); else if ((route().name === 'home' && a.id !== 'askNm') || route().name === 'att') render(); }, 30); }
 
 /* ---------- routing ---------- */
 function route() { const h = location.hash.slice(1) || 'home'; const [name, id] = h.split('/'); return { name, id }; }
@@ -347,10 +412,11 @@ function render() {
   $('#backBtn').hidden = !inner;
   $('#fab').textContent = t('newBest');
   document.querySelectorAll('nav.tabs a').forEach((a) => a.classList.toggle('on', a.dataset.tab === r.name));
-  if (!me) return v.innerHTML = viewSignin(), bindSignin();
+  if (!me && (anonBusy || KEY())) return v.innerHTML = '<div class="center"><div><img class="biglogo" src="church-logo.png" alt="我們家教會"><p class="muted">' + esc(t('starting')) + '</p></div></div>';
+  if (!me) return v.innerHTML = viewNoKey(), bindNoKey();
   if (meErr) return v.innerHTML = '<div class="center"><div><div class="big">BEST</div><p class="muted">' + esc(t('loadFail')) + '</p><button class="btn" id="retryBtn">' + esc(t('retry')) +
     '</button></div></div>', $('#retryBtn').onclick = async () => { meErr = false; try { meDoc = await loadMe(me); } catch (e) { meErr = true; } if (meDoc && meDoc.active) startData(); render(); };
-  if (!meDoc) return v.innerHTML = viewJoin(), bindJoin();
+  if (!meDoc) return v.innerHTML = viewNoKey(), bindNoKey();
   if (!meDoc.active) return v.innerHTML = viewInactive(), bindInactive();
   if (r.name === 'list') return v.innerHTML = viewList(), bindList();
   if (r.name === 'att') return v.innerHTML = viewAtt(), bindAtt();
@@ -362,36 +428,30 @@ function render() {
   v.innerHTML = viewHome(); bindHome();
 }
 
-/* ---------- sign in / join ---------- */
-function viewSignin() {
-  return '<div class="center"><div><div class="big">BEST</div><h2>' + esc(t('signinTitle')) + '</h2><p class="muted" style="white-space:pre-line">' + esc(t('signinSub')) +
-    '</p>' + (IN_APP ? '<p class="warnbox">' + esc(t('inAppWarn')) + '</p>' : '') + '<button class="btn wide" id="gBtn">' + esc(t('signinBtn')) + '</button>' +
-    '<div class="links"><a href="install.html">' + esc(t('install')) + '</a></div></div></div>';
+/* ---------- no key (not opened from the church QR) ---------- */
+let codeOpen = false, codeVal = '';   // survive re-renders (auth state arrives after the first paint)
+function viewNoKey() {
+  return '<div class="center" id="noKey"><div><img class="biglogo" src="church-logo.png" alt="我們家教會"><h2>' + esc(t('noKeyTitle')) + '</h2><p class="muted" style="white-space:pre-line">' + esc(t('noKeySub')) + '</p>' +
+    (joinErr ? '<p class="warnbox" id="codeErr">' + esc(t('codeBad')) + '</p>' : '') + '<p class="warnbox" style="background:var(--chip);color:var(--ink)">' + esc(t('camHint')) + '</p>' +
+    '<div class="links"><a href="#" id="codeLink">' + esc(t('codeLink')) + '</a><a href="install.html">' + esc(t('install')) + '</a></div>' +
+    '<div class="codebox" id="codeBox"' + (codeOpen ? '' : ' hidden') + '><label class="f">' + esc(t('codeLabel')) + '<input class="i" id="kCode" maxlength="32" autocapitalize="characters" autocomplete="off" style="letter-spacing:2px;font-weight:700" value="' + esc(codeVal) + '"></label>' +
+    '<button class="btn wide" id="kBtn">' + esc(t('codeBtn')) + '</button></div>' +
+    '<div class="links"><a href="#" id="gLink" style="color:var(--soft);font-weight:400">' + esc(t('adminLogin')) + '</a></div></div></div>';
 }
-function bindSignin() { $('#gBtn').onclick = doSignIn; }
-function viewJoin() {
-  return '<div class="card" style="margin-top:20px"><h2>' + esc(t('joinTitle')) + '</h2><p class="muted">' + esc(t('joinSub')) + '</p>' +
-    '<div style="display:grid;gap:12px"><label class="f">' + esc(t('joinName')) + '<input class="i" id="jName" maxlength="40" value="' + esc(me.displayName || '') + '"></label>' +
-    '<label class="f">' + esc(t('joinCode')) + '<input class="i" id="jCode" maxlength="16" autocapitalize="characters" autocomplete="off" style="letter-spacing:3px;font-weight:700"></label>' +
-    '<button class="btn wide" id="jBtn">' + esc(t('joinBtn')) + '</button><button class="btn ghost wide" id="soBtn">' + esc(t('signout')) + '</button></div></div>';
-}
-function bindJoin() {
-  $('#soBtn').onclick = () => signOut(auth);
-  $('#jBtn').onclick = async () => {
-    const name = $('#jName').value.trim(), code = $('#jCode').value.trim().toUpperCase().replace(/\s/g, '');
-    if (!name) return toast(t('needName'));
-    $('#jBtn').disabled = true;
-    try {
-      const b = writeBatch(db);
-      b.set(doc(db, 'staffKeys', me.uid), { code });
-      b.set(doc(db, 'staff', me.uid), { name, active: true, role: 'staff', joinedAt: serverTimestamp() });
-      await b.commit();
-      meDoc = { name, active: true, role: 'staff' }; startData(); location.hash = '#home'; render();
-    } catch (e) { toast(t('joinBad')); $('#jBtn').disabled = false; }
+function bindNoKey() {
+  $('#codeLink').onclick = (e) => { e.preventDefault(); codeOpen = true; $('#codeBox').hidden = false; $('#kCode').focus(); };
+  $('#kCode').oninput = (e) => { codeVal = e.target.value; };
+  $('#gLink').onclick = (e) => { e.preventDefault(); doSignIn(); };
+  $('#kBtn').onclick = async () => {
+    const k = $('#kCode').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (k.length < 8) return toast(t('codeBad'));
+    localStorage.setItem('best.key', k); joinErr = false; codeVal = ''; $('#kBtn').disabled = true;
+    if (!me) return startAnon();
+    meErr = false; await autoJoin(); if (meDoc && meDoc.active) startData(); render();
   };
 }
 function viewInactive() { return '<div class="center"><div><div class="big">BEST</div><h2>' + esc(t('inactiveTitle')) + '</h2><p class="muted">' + esc(t('inactiveSub')) + '</p><button class="btn ghost" id="soBtn">' + esc(t('signout')) + '</button></div></div>'; }
-function bindInactive() { $('#soBtn').onclick = () => signOut(auth); }
+function bindInactive() { if (me.isAnonymous) $('#soBtn').hidden = true; else $('#soBtn').onclick = () => signOut(auth); }
 
 /* ---------- derived data ---------- */
 const careName = (uid) => (staff.get(uid) || {}).name || '';
@@ -421,13 +481,20 @@ function dashboard() {
 }
 
 /* ---------- home ---------- */
+const nmHtml = (b) => esc(b.name) + (b.nick ? ' <span class="nick">(' + esc(b.nick) + ')</span>' : '');
 function personRow(b, right, extra = '') {
-  return '<div class="item" data-go="' + esc(b.id) + '">' + ava(b) + '<div class="t"><div class="n">' + esc(b.name) + '</div><div class="d">' + extra + '</div></div>' + right + '</div>';
+  return '<div class="item" data-go="' + esc(b.id) + '">' + ava(b) + '<div class="t"><div class="n">' + nmHtml(b) + '</div><div class="d">' + extra + '</div></div>' + right + '</div>';
 }
 function viewHome() {
   const d = dashboard(), td = today();
   const ret = d.cohort ? Math.round((d.kept / d.cohort) * 100) + '%' : '—';
-  let h = '<h2>' + esc(t('todayNeed')) + '</h2>';
+  let h = '';
+  if (IOS && !STANDALONE && localStorage.getItem('best.iosTip') !== '0')
+    h += '<div class="card" id="iosTip" style="display:grid;gap:8px"><p style="margin:0">' + esc(t('iosAddTip')) + '</p><button class="btn ghost small" id="iosTipX">' + esc(t('close')) + '</button></div>';
+  if (localStorage.getItem('best.askName') === '1')
+    h += '<div class="card" id="askCard" style="display:grid;gap:10px"><label class="f">' + esc(t('askName')) + '<input class="i" id="askNm" maxlength="40" placeholder="' + esc(t('defName')) + '"></label>' +
+      '<p class="muted" style="margin:0">' + esc(t('askNameSub')) + '</p><div class="row"><button class="btn small" id="askSave">' + esc(t('save')) + '</button><button class="btn small ghost" id="askSkip">' + esc(t('skip')) + '</button></div></div>';
+  h += '<h2>' + esc(t('todayNeed')) + '</h2>';
   const any = d.noContact.length + d.absent.length + d.due.length;
   if (!any) h += '<div class="card"><p class="empty">' + esc(t('allGood')) + '</p></div>';
   if (d.noContact.length) {
@@ -456,6 +523,12 @@ function viewHome() {
   return h;
 }
 function bindHome() {
+  if ($('#iosTipX')) $('#iosTipX').onclick = () => { localStorage.setItem('best.iosTip', '0'); render(); };
+  if ($('#askSkip')) $('#askSkip').onclick = () => { localStorage.removeItem('best.askName'); render(); };
+  if ($('#askSave')) $('#askSave').onclick = async () => {
+    const n = $('#askNm').value.trim().slice(0, 40); if (!n) return toast(t('needName'));
+    try { await updateDoc(doc(db, 'staff', me.uid), { name: n }); localStorage.setItem('best.name', n); localStorage.removeItem('best.askName'); toast(t('saved')); render(); } catch (e) { onErr(e); }
+  };
   document.querySelectorAll('[data-go]').forEach((el) => el.onclick = (e) => { if (e.target.closest('[data-done]')) return; location.hash = '#best/' + el.dataset.go; });
   document.querySelectorAll('[data-done]').forEach((el) => el.onclick = async () => {
     try { await updateDoc(doc(db, 'bests', el.dataset.done), { nextAction: '', nextDue: '', updatedAt: serverTimestamp(), updatedBy: me.uid }); } catch (e) { onErr(e); }
@@ -465,11 +538,11 @@ function bindHome() {
 
 /* ---------- list ---------- */
 function viewList() {
-  const f = listFilter, q = f.q.toLowerCase();
+  const norm = (x) => String(x || '').normalize('NFKC').toLowerCase(), f = listFilter, q = norm(f.q).trim();
   const staffArr = [...staff.values()].filter((s) => s.active);
   const arr = [...bests.values()].filter((b) => (!f.stage || b.stage === f.stage)
     && (!f.care || (f.care === '__me' ? b.caretaker === me.uid : f.care === '__none' ? !b.caretaker : b.caretaker === f.care))
-    && (!q || [b.name, b.phone, b.line].some((x) => (x || '').toLowerCase().includes(q))))
+    && (!q || [b.name, b.nick].some((x) => norm(x).includes(q))))
     .sort((a, b) => (b.firstVisit || '').localeCompare(a.firstVisit || '') || a.name.localeCompare(b.name));
   let h = '<div class="search"><input class="i" id="q" type="search" placeholder="' + esc(t('search')) + '" value="' + esc(f.q) + '">' +
     '<div class="seg" id="stSeg"><button data-s="" class="' + (!f.stage ? 'on' : '') + '">' + esc(t('all')) + ' ' + bests.size + '</button>' +
@@ -478,7 +551,7 @@ function viewList() {
     '<option value="__none"' + (f.care === '__none' ? ' selected' : '') + '>' + esc(t('noCare')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (f.care === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>';
   h += '<div class="card" id="listBox">' + (arr.length ? arr.map((b) => personRow(b, stageChip(b.stage),
-    esc(fmtDate(b.firstVisit)) + (b.caretaker ? ' · ' + esc(careName(b.caretaker)) : '') + (b.phone ? ' · ' + esc(b.phone) : ''))).join('') : '<p class="empty">' + esc(t('noResult')) + '</p>') + '</div>';
+    esc(fmtDate(b.firstVisit)) + (b.caretaker ? ' · ' + esc(careName(b.caretaker)) : ''))).join('') : '<p class="empty">' + esc(t('noResult')) + '</p>') + '</div>';
   return h;
 }
 function bindList() {
@@ -499,17 +572,17 @@ function viewForm(b) {
   const inp = (k, type = 'text', extra = '') => '<label class="f">' + esc(t(k)) + '<input class="i" id="f_' + k + '" type="' + type + '" value="' + esc(v[k] || '') + '" ' + extra + '></label>';
   const ta = (k) => '<label class="f">' + esc(t(k)) + '<textarea class="i" id="f_' + k + '" maxlength="2000">' + esc(v[k] || '') + '</textarea></label>';
   return '<h2>' + esc(b ? t('editBest') : t('regTitle')) + '</h2><div class="card" style="display:grid;gap:12px">' +
-    '<label class="f"><span>' + esc(t('name')) + ' <span class="req">*</span></span><input class="i" id="f_name" maxlength="60" value="' + esc(v.name || '') + '"></label>' +
+    '<label class="f"><span>' + esc(t('name')) + ' <span class="req">*</span></span><input class="i" id="f_name" maxlength="60" value="' + esc(v.name || '') + '"></label>' + inp('nick', 'text', 'maxlength="20"') +
     '<div class="photo-pick"><span id="phPrev">' + ava({ name: v.name, photo: formPhoto }) + '</span><label class="btn ghost small">' + esc(t('photoPick')) +
     '<input type="file" id="f_photo" accept="image/*" hidden></label><button class="btn ghost small" id="phDel"' + (formPhoto ? '' : ' hidden') + '>' + esc(t('photoDel')) + '</button></div>' +
     '<div class="grid2"><label class="f">' + esc(t('gender')) + '<select class="i" id="f_gender">' + opt(['m', 'f'], v.gender, 'g_') + '</select></label>' +
     '<label class="f">' + esc(t('age')) + '<select class="i" id="f_age">' + opt(AGES, v.age, 'a_') + '</select></label></div>' +
-    inp('phone', 'tel', 'maxlength="40" inputmode="tel"') + inp('line', 'text', 'maxlength="60" autocapitalize="off"') + inp('area', 'text', 'maxlength="200"') +
+    inp('job', 'text', 'maxlength="40"') + '<div class="grid2">' + inp('school', 'text', 'maxlength="40"') + inp('grade', 'text', 'maxlength="40"') + '</div>' + inp('area', 'text', 'maxlength="200"') +
     '<div class="grid2">' + inp('firstVisit', 'date') + inp('invitedBy', 'text', 'maxlength="60"') + '</div>' +
     '<label class="f">' + esc(t('faith')) + '<select class="i" id="f_faith">' + opt(FAITHS, v.faith, 'f_') + '</select></label>' +
     '<label class="f">' + esc(t('caretaker')) + '<select class="i" id="f_caretaker"><option value="">' + esc(t('none')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (v.caretaker === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label>' +
-    ta('family') + ta('prayer') + ta('memo') +
+    ta('family') + ta('memo') + ta('prayer') +
     '<button class="btn wide" id="fSave">' + esc(t('save')) + '</button><button class="btn ghost wide" id="fCancel">' + esc(t('cancel')) + '</button>' +
     (b && meDoc.role === 'admin' ? '<button class="btn warn wide" id="fDel">' + esc(t('del')) + '</button>' : '') + '</div>';
 }
@@ -534,14 +607,13 @@ function bindForm(b) {
   if ($('#fDel')) $('#fDel').onclick = async () => {
     if (!confirm(t('delAsk'))) return;
     try {
-      const logs = await getDocs(collection(db, 'bests', b.id, 'logs'));
-      const batch = writeBatch(db); logs.docs.forEach((d) => batch.delete(d.ref)); batch.delete(doc(db, 'bests', b.id)); await batch.commit();
-      location.hash = '#list';
+      const [logs, notes] = await Promise.all([getDocs(collection(db, 'bests', b.id, 'logs')), getDocs(collection(db, 'bests', b.id, 'notes'))]);
+      const batch = writeBatch(db); [...logs.docs, ...notes.docs].forEach((d) => batch.delete(d.ref)); batch.delete(doc(db, 'bests', b.id)); await batch.commit();      location.hash = '#list';
     } catch (e) { onErr(e); }
   };
   $('#fSave').onclick = async () => {
     const val = (k) => $('#f_' + k).value.trim();
-    const data = { name: val('name'), photo: formPhoto || '', gender: val('gender'), age: val('age'), phone: val('phone'), line: val('line'), area: val('area'),
+    const data = { name: val('name'), nick: val('nick'), photo: formPhoto || '', gender: val('gender'), age: val('age'), job: val('job'), school: val('school'), grade: val('grade'), area: val('area'),
       firstVisit: val('firstVisit'), invitedBy: val('invitedBy'), faith: val('faith'), caretaker: val('caretaker'), family: val('family'), prayer: val('prayer'), memo: val('memo'),
       updatedAt: serverTimestamp(), updatedBy: me.uid };
     if (!data.name) return toast(t('needName'));
@@ -564,14 +636,16 @@ function viewDetail(b) {
   const td = today();
   const staffArr = [...staff.values()].filter((s) => s.active || s.id === b.caretaker);
   const kv = (k, v) => v ? '<dt>' + esc(t(k)) + '</dt><dd>' + v + '</dd>' : '';
-  let h = '<div class="card"><div class="hero">' + ava(b) + '<div style="min-width:0"><div class="nm">' + esc(b.name) + '</div>' + stageChip(b.stage) +
+  let h = '<div class="card"><div class="hero">' + ava(b) + '<div style="min-width:0"><div class="nm">' + nmHtml(b) + '</div>' + stageChip(b.stage) +
     (b.lastContact ? ' <span class="muted">' + esc(t('lastContact')) + ' ' + esc(fmtDate(b.lastContact)) + '</span>' : '') + '</div></div>' +
-    '<div class="row" style="margin-top:12px">' + (b.phone ? '<a class="btn small" href="tel:' + esc(b.phone.replace(/[^0-9+]/g, '')) + '">📞 ' + esc(t('call')) + '</a>' : '') +
-    (b.line ? '<button class="btn small ghost" id="cpLine">' + esc(t('copyLine')) + ' · ' + esc(b.line) + '</button><a class="btn small ghost" href="https://line.me/R/ti/p/~' + encodeURIComponent(b.line) + '" target="_blank" rel="noopener">' + esc(t('openLine')) + '</a>' : '') +
-    '<a class="btn small ghost" href="#edit/' + esc(b.id) + '">✎ ' + esc(t('editBest')) + '</a></div>' +
-    '<dl class="kv" style="margin-top:12px">' + kv('phone', esc(b.phone)) + kv('gender', b.gender ? esc(t('g_' + b.gender)) : '') + kv('age', b.age ? esc(t('a_' + b.age)) : '') +
+    '<div class="row" style="margin-top:12px">' +'<a class="btn small ghost" href="#edit/' + esc(b.id) + '">✎ ' + esc(t('editBest')) + '</a></div>' +
+    '<dl class="kv" style="margin-top:12px">' + kv('gender', b.gender ? esc(t('g_' + b.gender)) : '') + kv('age', b.age ? esc(t('a_' + b.age)) : '') +
+    kv('job', esc(b.job)) + kv('school', esc(b.school)) + kv('grade', esc(b.grade)) +
     kv('area', esc(b.area)) + kv('firstVisit', esc(b.firstVisit)) + kv('invitedBy', esc(b.invitedBy)) + kv('faith', b.faith ? esc(t('f_' + b.faith)) : '') +
-    kv('family', esc(b.family)) + kv('prayer', esc(b.prayer)) + kv('memo', esc(b.memo)) + '</dl></div>';
+    kv('family', esc(b.family)) + kv('memo', esc(b.memo)) + '</dl>' +
+    '<div class="supp" id="suppBox"><div class="sh">' + esc(t('supp')) + '</div><div id="suppList">' + notesHtml(b) + '</div>' +
+    '<textarea class="i" id="suppTxt" maxlength="500" placeholder="' + esc(t('suppPh')) + '"></textarea><button class="btn small ghost" id="suppAdd">' + esc(t('suppAdd')) + '</button></div>' +
+    '<dl class="kv">' + kv('prayer', esc(b.prayer)) + '</dl></div>';
   h += '<div class="card"><label class="f">' + esc(t('caretaker')) + '<select class="i" id="careSel"><option value="">' + esc(t('none')) + '</option>' +
     staffArr.map((s) => '<option value="' + esc(s.id) + '"' + (b.caretaker === s.id ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></label></div>';
   h += '<div class="card"><h3 style="margin:0 0 8px;font-size:17px">' + esc(t('moveTo')) + '</h3><div class="pipe">' +
@@ -596,6 +670,22 @@ function viewDetail(b) {
     '<div id="logList" style="margin-top:8px">' + logsHtml(b) + '</div></div>';
   return h;
 }
+/* supplements ("보충 / 補充") under the memo: bests/{id}/notes/{nid} {text, by, byName, at} - append-only; author or admin may delete */
+let notesFor = null, notesUnsub = null, notesCache = [];
+const fmtDT = (d) => d ? ymd(d) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) : '';
+function notesHtml(b) {
+  const N = notesCache.filter((n) => n._b === b.id);
+  if (!N.length) return '<p class="empty" style="margin:0">' + esc(t('suppNone')) + '</p>';
+  return N.map((n) => '<div class="sn" data-note="' + esc(n.id) + '"><p>' + esc(n.text) + '</p><div class="sm"><span>' + esc(t('suppAt')) + ' ' + esc(fmtDT(n.atD)) + '</span><span>· ' +
+    esc(t('suppBy')) + ' ' + esc(careName(n.by) || n.byName) + '</span>' + (n.by === me.uid || meDoc.role === 'admin' ? '<button class="btn small ghost" data-ndel="' + esc(n.id) + '">' + esc(t('suppDel')) + '</button>' : '') +
+    '</div></div>').join('');
+}
+function bindNotes(b) {
+  document.querySelectorAll('[data-ndel]').forEach((el) => el.onclick = async () => {
+    if (!confirm(t('suppDelAsk'))) return;
+    try { await deleteDoc(doc(db, 'bests', b.id, 'notes', el.dataset.ndel)); } catch (e) { onErr(e); }
+  });
+}
 function logsHtml(b) {
   const L = logsCache.filter((l) => l._b === b.id);
   if (!L.length) return '<p class="empty">' + esc(t('noLogs')) + '</p>';
@@ -612,7 +702,22 @@ function bindDetail(b) {
       const el = $('#logList'); if (el && route().id === b.id) el.innerHTML = logsHtml(b);
     }, onErr);
   }
-  if ($('#cpLine')) $('#cpLine').onclick = async () => { try { await navigator.clipboard.writeText(b.line); toast(t('copied')); } catch (e) { prompt(t('line'), b.line); } };
+  if (notesFor !== b.id) {
+    if (notesUnsub) notesUnsub(); notesFor = b.id; notesCache = [];
+    notesUnsub = onSnapshot(collection(db, 'bests', b.id, 'notes'), (qs) => {
+      notesCache = qs.docs.map((d) => { const x = d.data({ serverTimestamps: 'estimate' }); return { id: d.id, _b: b.id, ...x, atD: x.at ? x.at.toDate() : null }; })
+        .sort((p, q) => (p.atD || 0) - (q.atD || 0));   // newest last
+      const el = $('#suppList'); if (el && route().id === b.id) { el.innerHTML = notesHtml(b); bindNotes(b); }
+    }, onErr);
+  }
+  bindNotes(b);
+  $('#suppAdd').onclick = async () => {
+    const text = $('#suppTxt').value.trim().slice(0, 500); if (!text) return $('#suppTxt').focus();
+    $('#suppAdd').disabled = true;
+    try { await addDoc(collection(db, 'bests', b.id, 'notes'), { text, by: me.uid, byName: (meDoc.name || '').slice(0, 40), at: serverTimestamp() }); $('#suppTxt').value = ''; toast(t('saved')); }
+    catch (e) { onErr(e); }
+    $('#suppAdd').disabled = false;
+  };
   const upd = (data) => updateDoc(doc(db, 'bests', b.id), { ...data, updatedAt: serverTimestamp(), updatedBy: me.uid }).catch(onErr);
   $('#careSel').onchange = (e) => { e.target.blur(); upd({ caretaker: e.target.value }).then(() => toast(t('saved'))); };
   document.querySelectorAll('[data-st]').forEach((el) => el.onclick = () => {
@@ -648,7 +753,7 @@ function viewAtt() {
     '<div class="row"><label class="f" style="flex:1">' + esc(t('attDay')) + '<input class="i" type="date" id="attDay" value="' + attDay + '"></label>' +
     '<span class="chip" style="align-self:end;min-height:40px;font-size:16px">' + esc(t('present', { n: [...ids].filter((i) => bests.has(i)).length })) + '</span></div>' +
     '<div class="att">' + (arr.length ? arr.map((b) => { const y = ids.has(b.id); return '<button data-att="' + esc(b.id) + '" class="' + (y ? 'y' : '') + '">' + ava(b) +
-      '<span><b>' + esc(b.name) + '</b><br><span class="muted">' + esc(t('s_' + b.stage)) + '</span></span><span class="ck">' + (y ? '✔' : '') + '</span></button>'; }).join('') : '<p class="empty">' + esc(t('noResult')) + '</p>') + '</div>';
+      '<span><b>' + nmHtml(b) + '</b><br><span class="muted">' + esc(t('s_' + b.stage)) + '</span></span><span class="ck">' + (y ? '✔' : '') + '</span></button>'; }).join('') : '<p class="empty">' + esc(t('noResult')) + '</p>') + '</div>';
 }
 function bindAtt() {
   $('#attDay').onchange = (e) => { attDay = e.target.value || lastSunday(); render(); };
@@ -666,38 +771,47 @@ function viewMore() {
   const list = [...staff.values()].sort((a, b) => (b.active - a.active) || a.name.localeCompare(b.name));
   let h = '<h2>' + esc(t('moreTitle')) + '</h2><div class="card" style="display:grid;gap:10px"><b>' + esc(t('me')) + '</b>' +
     '<label class="f">' + esc(t('myName')) + '<input class="i" id="myName" maxlength="40" value="' + esc(meDoc.name) + '"></label>' +
-    '<button class="btn ghost" id="renameBtn">' + esc(t('rename')) + '</button><p class="muted" style="margin:0">' + esc(me.email || '') + (admin ? ' · ' + esc(t('admin')) : '') + '</p>' +
-    '<a class="btn ghost" href="install.html">' + esc(t('install')) + '</a><button class="btn ghost" id="soBtn">' + esc(t('signout')) + '</button></div>';
+    '<button class="btn ghost" id="renameBtn">' + esc(t('rename')) + '</button><p class="muted" style="margin:0">' + esc(me.isAnonymous ? t('anonMe') : (me.email || '')) + (admin ? ' · ' + esc(t('admin')) : '') + '</p>' +
+    '<a class="btn ghost" href="install.html">' + esc(t('install')) + '</a>' +
+    (me.isAnonymous ? '<button class="btn ghost small" id="adminBtn">' + esc(t('adminLogin')) + '</button>' : '<button class="btn ghost" id="soBtn">' + esc(t('signout')) + '</button>') + '</div>';
   h += '<div class="card"><b>' + esc(t('staffList')) + ' · ' + list.filter((s) => s.active).length + '</b>' + list.map((s) => '<div class="item" style="cursor:default"><span class="ava">' + initial(s.name) + '</span><div class="t"><div class="n">' + esc(s.name) +
     (s.role === 'admin' ? ' <span class="chip">' + esc(t('admin')) + '</span>' : '') + (!s.active ? ' <span class="tag">' + esc(t('inactive')) + '</span>' : '') + '</div></div>' +
     (admin && s.id !== me.uid ? '<button class="btn small ' + (s.active ? 'warn' : 'ghost') + '" data-act="' + esc(s.id) + '" data-on="' + (s.active ? '0' : '1') + '">' + esc(s.active ? t('deactivate') : t('activate')) + '</button>' : '') + '</div>').join('') + '</div>';
   if (admin) {
     h += '<div class="card" style="display:grid;gap:10px"><b>' + esc(t('inviteTitle')) + '</b><p class="muted" style="margin:0">' + esc(t('inviteSub')) + '</p>' +
-      '<button class="btn ghost" id="invBtn">' + esc(t('inviteNew')) + '</button><p id="invOut" style="font-size:22px;font-weight:800;letter-spacing:3px;margin:0"></p></div>' +
+      '<button class="btn ghost" id="invBtn">' + esc(t('inviteNew')) + '</button><div id="invOut" hidden><p style="margin:0">' + esc(t('inviteShown')) +
+      ' <b id="invCode" style="font-size:20px;letter-spacing:2px"></b></p><p class="muted" id="invLink" style="margin:0;word-break:break-all"></p></div></div>' +
       '<div class="card"><button class="btn wide" id="csvBtn">' + esc(t('exportCsv')) + '</button></div>';
   }
   return h;
 }
 function bindMore() {
-  $('#soBtn').onclick = () => { location.hash = '#home'; signOut(auth); };
-  $('#renameBtn').onclick = async () => { const n = $('#myName').value.trim(); if (!n) return toast(t('needName')); try { await updateDoc(doc(db, 'staff', me.uid), { name: n }); toast(t('saved')); } catch (e) { onErr(e); } };
+  if ($('#soBtn')) $('#soBtn').onclick = () => { location.hash = '#home'; signOut(auth); };
+  if ($('#adminBtn')) $('#adminBtn').onclick = doSignIn;
+  $('#renameBtn').onclick = async () => { const n = $('#myName').value.trim(); if (!n) return toast(t('needName')); try { await updateDoc(doc(db, 'staff', me.uid), { name: n }); localStorage.setItem('best.name', n); localStorage.removeItem('best.askName'); toast(t('saved')); } catch (e) { onErr(e); } };
   document.querySelectorAll('[data-act]').forEach((el) => el.onclick = async () => { try { await updateDoc(doc(db, 'staff', el.dataset.act), { active: el.dataset.on === '1' }); } catch (e) { onErr(e); } });
   if ($('#invBtn')) $('#invBtn').onclick = async () => {
-    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(8));
+    const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789', r = crypto.getRandomValues(new Uint32Array(16));
     const code = [...r].map((x) => A[x % A.length]).join('');
-    try { await setDoc(doc(db, 'config', 'invite'), { code, updatedAt: serverTimestamp() }); $('#invOut').textContent = t('inviteShown', { c: code }); } catch (e) { onErr(e); }
+    try { await setDoc(doc(db, 'config', 'invite'), { code, updatedAt: serverTimestamp() }); $('#invCode').textContent = code; $('#invLink').textContent = location.origin + '/install.html?k=' + code; $('#invOut').hidden = false; } catch (e) { onErr(e); }
   };
   if ($('#csvBtn')) $('#csvBtn').onclick = exportCsv;
 }
-function exportCsv() {
-  const cols = ['name', 'gender', 'age', 'phone', 'line', 'area', 'firstVisit', 'invitedBy', 'faith', 'family', 'prayer', 'memo'];
-  const head = [...cols.map((c) => t(c)), t('stage'), t('caretaker'), t('lastContact'), t('next'), t('due'), t('clsTitle'), t('tabAtt')];
+async function exportCsv() {
+  const cols = ['name', 'nick', 'gender', 'age', 'job', 'school', 'grade', 'area', 'firstVisit', 'invitedBy', 'faith', 'family', 'prayer', 'memo'];
+  const head = [...cols.map((c) => t(c)), t('supp'), t('stage'), t('caretaker'), t('lastContact'), t('next'), t('due'), t('clsTitle'), t('tabAtt')];
   const cell = (x) => '"' + String(x ?? '').replace(/"/g, '""') + '"';
-  const rows = [...bests.values()].sort((a, b) => (a.firstVisit || '').localeCompare(b.firstVisit || '')).map((b) => [
+  const list = [...bests.values()].sort((a, b) => (a.firstVisit || '').localeCompare(b.firstVisit || ''));
+  let notes;
+  try { notes = await Promise.all(list.map((b) => getDocs(collection(db, 'bests', b.id, 'notes')))); } catch (e) { return onErr(e); }
+  const joinNotes = (qs) => qs.docs.map((d) => d.data()).map((n) => ({ ...n, atD: n.at ? n.at.toDate() : null })).sort((p, q) => (p.atD || 0) - (q.atD || 0))
+    .map((n) => fmtDT(n.atD) + ' ' + (careName(n.by) || n.byName || '') + ': ' + n.text).join(' | ');
+  const rows = list.map((b, i) => [
     ...cols.map((c) => c === 'gender' && b.gender ? t('g_' + b.gender) : c === 'age' && b.age ? t('a_' + b.age) : c === 'faith' && b.faith ? t('f_' + b.faith) : b[c]),
+    joinNotes(notes[i]),
     t('s_' + b.stage), careName(b.caretaker), b.lastContact, b.nextAction, b.nextDue, (b.cls || []).filter(Boolean).length + '/5',
     attendance.filter((a) => a.ids.has(b.id)).length]);
-  const csv = '﻿' + [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
+  const csv = '\ufeff' + [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'BEST-' + today() + '.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
