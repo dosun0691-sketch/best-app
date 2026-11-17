@@ -119,9 +119,6 @@ nav.tabs a.on{color:var(--pri-deep)}
 .pipe button.on{border-color:var(--pri);background:var(--chip);font-weight:800}
 .pipe button .num{width:26px;height:26px;border-radius:50%;background:var(--line);display:grid;place-items:center;font-size:13px;font-weight:800}
 .pipe button.on .num{background:var(--pri);color:#fff}
-.weeks{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-.weeks label{display:grid;place-items:center;gap:2px;min-height:58px;border:1.5px solid var(--line);border-radius:12px;font-size:14px;cursor:pointer}
-.weeks input{width:22px;height:22px;accent-color:var(--pri)}
 .dots{display:flex;gap:6px;flex-wrap:wrap}
 .dot{display:grid;place-items:center;width:40px;height:44px;border-radius:10px;background:var(--chip);font-size:11px;color:var(--soft)}
 .dot b{font-size:16px}
@@ -224,7 +221,7 @@ const STR = {
     area: '사는 곳', firstVisit: '첫 방문일', invitedBy: '인도자', faith: '신앙 배경', family: '가족', prayer: '기도 제목', memo: '기억해 둘 일',
     caretaker: '섬김이', none: '— 선택 안 함 —', save: '저장', cancel: '취소', del: 'BEST 삭제', delAsk: '이 BEST와 모든 기록을 삭제할까요? 되돌릴 수 없습니다.',
     saved: '저장했습니다', needName: '이름을 입력하세요', stage: '단계', stageHist: '단계 기록', moveTo: '단계 바꾸기',
-    clsTitle: 'BEST반 (5주)', week: '{n}주', attHist: '주일 출석 (최근 8주)', attNone: '아직 출석 기록이 없습니다',
+    attHist: '주일 출석 (최근 8주)', attNone: '아직 출석 기록이 없습니다',
     logs: '연락·심방 기록', addLog: '+ 기록 추가', logDate: '날짜', method: '방법', content: '내용', next: '다음 할 일', due: '언제까지',
     noLogs: '아직 기록이 없습니다', lastContact: '마지막 연락', call: '전화 걸기', copyLine: 'LINE ID 복사', copied: '복사했습니다',
     attTitle: '주일 출석 체크', attSub: '이름을 누르면 출석으로 표시됩니다 (바로 저장).', attDay: '주일 날짜', present: '출석 {n}명',
@@ -259,7 +256,7 @@ const STR = {
     area: '居住地區', firstVisit: '初次來訪日', invitedBy: '邀請人', faith: '信仰背景', family: '家人', prayer: '代禱事項', memo: '值得記住的事項',
     caretaker: '陪伴者', none: '— 未選擇 —', save: '儲存', cancel: '取消', del: '刪除 BEST', delAsk: '確定刪除這位 BEST 和所有紀錄嗎？無法復原。',
     saved: '已儲存', needName: '請輸入姓名', stage: '階段', stageHist: '階段紀錄', moveTo: '變更階段',
-    clsTitle: 'BEST班（5 週）', week: '第{n}週', attHist: '主日出席（最近 8 週）', attNone: '還沒有出席紀錄',
+    attHist: '主日出席（最近 8 週）', attNone: '還沒有出席紀錄',
     logs: '聯繫・探訪紀錄', addLog: '+ 新增紀錄', logDate: '日期', method: '方式', content: '內容', next: '下一步', due: '期限',
     noLogs: '還沒有紀錄', lastContact: '最後聯繫', call: '打電話', copyLine: '複製 LINE ID', copied: '已複製',
     attTitle: '主日出席點名', attSub: '點姓名即標記為出席（立即儲存）。', attDay: '主日日期', present: '出席 {n} 人',
@@ -658,9 +655,6 @@ function viewDetail(b) {
     SIDE_STAGES.map((s) => '<button data-st="' + s + '" class="' + (b.stage === s ? 'on' : '') + '">' + esc(t('s_' + s)) + '</button>').join('') + '</div>' +
     '<details style="margin-top:10px"><summary class="muted">' + esc(t('stageHist')) + '</summary><ul style="margin:6px 0;padding-left:18px">' +
     (b.stageHistory || []).slice().reverse().map((x) => '<li>' + esc(x.d) + ' · ' + esc(t('s_' + x.s)) + (x.by ? ' <span class="muted">(' + esc(careName(x.by)) + ')</span>' : '') + '</li>').join('') + '</ul></details></div>';
-  const cls = b.cls || [false, false, false, false, false];
-  h += '<div class="card"><h3 style="margin:0 0 8px;font-size:17px">' + esc(t('clsTitle')) + ' · ' + cls.filter(Boolean).length + '/5</h3><div class="weeks">' +
-    cls.map((c, i) => '<label><input type="checkbox" data-wk="' + i + '"' + (c ? ' checked' : '') + '>' + esc(t('week', { n: i + 1 })) + '</label>').join('') + '</div></div>';
   const sundays = attendance.filter((a) => !b.firstVisit || a.id >= b.firstVisit).slice(0, 8).reverse();
   h += '<div class="card"><h3 style="margin:0 0 8px;font-size:17px">' + esc(t('attHist')) + '</h3>' + (sundays.length ? '<div class="dots">' +
     sundays.map((a) => { const y = a.ids.has(b.id); return '<span class="dot' + (y ? ' y' : '') + '"><b>' + (y ? '●' : '○') + '</b>' + esc(fmtDate(a.id)) + '</span>'; }).join('') + '</div>' : '<p class="empty">' + esc(t('attNone')) + '</p>') + '</div>';
@@ -739,9 +733,6 @@ function bindDetail(b) {
     const s = el.dataset.st; if (s === b.stage) return;
     upd({ stage: s, stageHistory: [...(b.stageHistory || []), { s, d: today(), by: me.uid }].slice(-200) });
   });
-  document.querySelectorAll('[data-wk]').forEach((el) => el.onchange = () => {
-    const cls = (b.cls || [false, false, false, false, false]).slice(); cls[+el.dataset.wk] = el.checked; upd({ cls });
-  });
   $('#addLogBtn').onclick = () => { const f = $('#logForm'); f.hidden = !f.hidden; if (!f.hidden) $('#l_content').focus(); };
   $('#l_save').onclick = async () => {
     const v = (k) => $('#l_' + k).value.trim();
@@ -814,7 +805,7 @@ function bindMore() {
 }
 async function exportCsv() {
   const cols = ['name', 'nick', 'gender', 'age', 'job', 'school', 'grade', 'area', 'firstVisit', 'invitedBy', 'faith', 'family', 'prayer', 'memo'];
-  const head = [...cols.map((c) => t(c)), t('supp'), t('stage'), t('caretaker'), t('lastContact'), t('next'), t('due'), t('clsTitle'), t('tabAtt')];
+  const head = [...cols.map((c) => t(c)), t('supp'), t('stage'), t('caretaker'), t('lastContact'), t('next'), t('due'), t('tabAtt')];
   const cell = (x) => '"' + String(x ?? '').replace(/"/g, '""') + '"';
   const list = [...bests.values()].sort((a, b) => (a.firstVisit || '').localeCompare(b.firstVisit || ''));
   let notes;
@@ -824,7 +815,7 @@ async function exportCsv() {
   const rows = list.map((b, i) => [
     ...cols.map((c) => c === 'gender' && b.gender ? t('g_' + b.gender) : c === 'age' && b.age ? t('a_' + b.age) : c === 'faith' && b.faith ? t('f_' + b.faith) : b[c]),
     joinNotes(notes[i]),
-    t('s_' + b.stage), careName(b.caretaker), b.lastContact, b.nextAction, b.nextDue, (b.cls || []).filter(Boolean).length + '/5',
+    t('s_' + b.stage), careName(b.caretaker), b.lastContact, b.nextAction, b.nextDue,
     attendance.filter((a) => a.ids.has(b.id)).length]);
   const csv = '\ufeff' + [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
