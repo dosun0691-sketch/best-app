@@ -153,6 +153,18 @@ nav.tabs a.on{color:var(--pri-deep)}
 .links{display:flex;gap:14px;justify-content:center;margin-top:14px;font-size:15px}
 .links a{color:var(--pri-deep);font-weight:700}
 .seg button.on{background:var(--pri);border-color:var(--pri);color:var(--pri-ink);font-weight:700}
+/* photo crop dialog (O62) */
+.crop{position:fixed;inset:0;z-index:30;background:rgba(20,12,8,.72);display:grid;place-items:center;overscroll-behavior:contain;
+  padding:calc(12px + env(safe-area-inset-top,0px)) calc(12px + env(safe-area-inset-right,0px)) calc(12px + env(safe-area-inset-bottom,0px)) calc(12px + env(safe-area-inset-left,0px))}
+.cropbox{background:var(--paper);border-radius:18px;padding:14px;width:min(100%,400px);max-height:100%;overflow:auto;display:grid;gap:10px}
+.cropbox h3{margin:0;font-size:18px}
+.cropbox .muted{margin:0}
+.cropst{position:relative;width:100%;aspect-ratio:1/1;overflow:hidden;border-radius:12px;background:#111;touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none}
+.cropst:active{cursor:grabbing}
+.cropst img{position:absolute;max-width:none;pointer-events:none;-webkit-user-drag:none}
+.cropring{position:absolute;inset:0;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.45),inset 0 0 0 2px rgba(255,255,255,.9);pointer-events:none}
+.cropz{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;color:var(--soft)}
+.cropz input{flex:1;min-height:40px;accent-color:var(--pri)}
 </style>
 </head>
 <body>
@@ -217,7 +229,7 @@ const STR = {
     absentN: '{n}주 연속 결석', done: '완료', statActive: '돌봄 중 BEST', statNew: '이번 달 새 BEST', statRet: '8주 정착률',
     retHint: '첫 방문 8주 이상 지난 BEST 중, 최근 4주 출석 또는 소그룹·정착 단계인 비율', byStage: '단계별 BEST',
     search: '이름·별명 검색', all: '전체', mine: '내 담당', anyCare: '섬김이 전체', noCare: '섬김이 미정', noResult: 'BEST가 없습니다',
-    name: '이름', photo: '사진', photoPick: '사진 선택', photoDel: '사진 삭제', gender: '성별', age: '나이대', job: '직업', school: '학교(과)', grade: '학년',
+    name: '이름', photo: '사진', photoPick: '사진 선택', photoDel: '사진 삭제', photoAdj: '사진 조정', cropTitle: '사진 위치·크기 조정', cropHint: '손가락이나 마우스로 끌어서 옮기고, 두 손가락·마우스 휠·아래 막대로 확대/축소하세요.', cropZoom: '확대/축소', gender: '성별', age: '나이대', job: '직업', school: '학교(과)', grade: '학년',
     area: '사는 곳', firstVisit: '첫 방문일', invitedBy: '인도자', faith: '신앙 배경', family: '가족', prayer: '기도 제목', memo: '기억해 둘 일',
     caretaker: '섬김이', none: '— 선택 안 함 —', save: '저장', cancel: '취소', del: 'BEST 삭제', delAsk: '이 BEST와 모든 기록을 삭제할까요? 되돌릴 수 없습니다.',
     saved: '저장했습니다', needName: '이름을 입력하세요', stage: '단계', stageHist: '단계 기록', moveTo: '단계 바꾸기',
@@ -252,7 +264,7 @@ const STR = {
     absentN: '連續缺席 {n} 週', done: '完成', statActive: '關懷中 BEST', statNew: '本月新BEST', statRet: '8 週定著率',
     retHint: '初次來訪已滿 8 週的 BEST 中，最近 4 週有出席或已在連結小組／定著階段的比例', byStage: '各階段 BEST',
     search: '搜尋姓名・暱稱', all: '全部', mine: '我負責的', anyCare: '所有陪伴者', noCare: '未指定陪伴者', noResult: '沒有 BEST',
-    name: '姓名', photo: '照片', photoPick: '選擇照片', photoDel: '刪除照片', gender: '性別', age: '年齡層', job: '職業', school: '學校(科系)', grade: '年級',
+    name: '姓名', photo: '照片', photoPick: '選擇照片', photoDel: '刪除照片', photoAdj: '調整照片', cropTitle: '調整照片位置與大小', cropHint: '用手指或滑鼠拖曳移動；用兩指、滑鼠滾輪或下方滑桿放大縮小。', cropZoom: '放大縮小', gender: '性別', age: '年齡層', job: '職業', school: '學校(科系)', grade: '年級',
     area: '居住地區', firstVisit: '初次來訪日', invitedBy: '邀請人', faith: '信仰背景', family: '家人', prayer: '代禱事項', memo: '值得記住的事項',
     caretaker: '陪伴者', none: '— 未選擇 —', save: '儲存', cancel: '取消', del: '刪除 BEST', delAsk: '確定刪除這位 BEST 和所有紀錄嗎？無法復原。',
     saved: '已儲存', needName: '請輸入姓名', stage: '階段', stageHist: '階段紀錄', moveTo: '變更階段',
@@ -386,7 +398,7 @@ function errMsg(e) {
 }
 function onErr(e) { console.error(e); toast(errMsg(e)); }
 let rerenderTimer = 0;
-function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { const a = document.activeElement; if (!a || !a.matches('input,textarea,select')) render(); else if ((route().name === 'home' && a.id !== 'askNm') || route().name === 'att') render(); }, 30); }
+function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { if (cropOpen) return; const a = document.activeElement; if (!a || !a.matches('input,textarea,select')) render(); else if ((route().name === 'home' && a.id !== 'askNm') || route().name === 'att') render(); }, 30); }
 
 /* ---------- routing ---------- */
 function route() { const h = location.hash.slice(1) || 'home'; const [name, id] = h.split('/'); return { name, id }; }
@@ -572,7 +584,8 @@ function viewForm(b) {
   return '<h2>' + esc(b ? t('editBest') : t('regTitle')) + '</h2><div class="card" style="display:grid;gap:12px">' +
     '<label class="f"><span>' + esc(t('name')) + ' <span class="req">*</span></span><input class="i" id="f_name" maxlength="60" value="' + esc(v.name || '') + '"></label>' + inp('nick', 'text', 'maxlength="20"') +
     '<div class="photo-pick"><span id="phPrev">' + ava({ name: v.name, photo: formPhoto }) + '</span><label class="btn ghost small">' + esc(t('photoPick')) +
-    '<input type="file" id="f_photo" accept="image/*" hidden></label><button class="btn ghost small" id="phDel"' + (formPhoto ? '' : ' hidden') + '>' + esc(t('photoDel')) + '</button></div>' +
+    '<input type="file" id="f_photo" accept="image/*" hidden></label><button class="btn ghost small" id="phAdj"' + (formPhoto ? '' : ' hidden') + '>' + esc(t('photoAdj')) + '</button>' +
+    '<button class="btn ghost small" id="phDel"' + (formPhoto ? '' : ' hidden') + '>' + esc(t('photoDel')) + '</button></div>' +
     '<div class="grid2"><label class="f">' + esc(t('gender')) + '<select class="i" id="f_gender">' + opt(['m', 'f'], v.gender, 'g_') + '</select></label>' +
     '<label class="f">' + esc(t('age')) + '<select class="i" id="f_age">' + opt(AGES, v.age, 'a_') + '</select></label></div>' +
     inp('job', 'text', 'maxlength="40"') + '<div class="grid2">' + inp('school', 'text', 'maxlength="40"') + inp('grade', 'text', 'maxlength="40"') + '</div>' + inp('area', 'text', 'maxlength="200"') +
@@ -584,23 +597,76 @@ function viewForm(b) {
     '<button class="btn wide" id="fSave">' + esc(t('save')) + '</button><button class="btn ghost wide" id="fCancel">' + esc(t('cancel')) + '</button>' +
     (b && meDoc.role === 'admin' ? '<button class="btn warn wide" id="fDel">' + esc(t('del')) + '</button>' : '') + '</div>';
 }
-function resizePhoto(file) {
+/* ---------- photo crop: drag to move, slider / pinch / wheel to zoom, then save a square JPEG (owner O62) ---------- */
+let cropOpen = false;   // the crop dialog lives on <body>; data re-renders wait while it is open
+function jpegUnder(c) {   // same size limit as before: <= 280 KB (rules allow 300000 chars)
+  let q = 0.8, out = c.toDataURL('image/jpeg', q);
+  while (out.length > 280000 && q > 0.3) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
+  return out;
+}
+function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (adjust); resolves a 400x400 JPEG data URL, or null on cancel
   return new Promise((res, rej) => {
-    const img = new Image(), url = URL.createObjectURL(file);
+    const own = typeof src !== 'string', url = own ? URL.createObjectURL(src) : src, img = new Image();
+    img.onerror = () => { if (own) URL.revokeObjectURL(url); rej(new Error('photo')); };
     img.onload = () => {
-      const max = 400, s = Math.min(1, max / Math.max(img.width, img.height));
-      const c = document.createElement('canvas'); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
-      let q = 0.8, out = c.toDataURL('image/jpeg', q);
-      while (out.length > 280000 && q > 0.3) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
-      res(out);
+      const d = document.createElement('div'); d.className = 'crop'; d.id = 'cropDlg'; d.setAttribute('role', 'dialog'); d.setAttribute('aria-modal', 'true');
+      d.innerHTML = '<div class="cropbox"><h3>' + esc(t('cropTitle')) + '</h3><div class="cropst" id="cropSt"><img alt="" id="cropImg" draggable="false"><div class="cropring"></div></div>' +
+        '<p class="muted">' + esc(t('cropHint')) + '</p><label class="cropz"><span>−</span><input type="range" id="cropZoom" min="1" max="4" step="0.01" value="1" aria-label="' + esc(t('cropZoom')) + '"><span>+</span></label>' +
+        '<div class="grid2"><button class="btn ghost" id="cropCancel">' + esc(t('cancel')) + '</button><button class="btn" id="cropSave">' + esc(t('save')) + '</button></div></div>';
+      document.body.appendChild(d); cropOpen = true;
+      const bodyOv = document.body.style.overflow; document.body.style.overflow = 'hidden';
+      const st = d.querySelector('#cropSt'), im = d.querySelector('#cropImg'), zr = d.querySelector('#cropZoom');
+      im.src = url;
+      const iw = img.naturalWidth, ih = img.naturalHeight;
+      let F = st.clientWidth, z = 1, ox = 0, oy = 0;   // F: frame size (CSS px); ox/oy: image centre offset from the frame centre
+      const sc = () => Math.max(F / iw, F / ih) * z;   // z = 1: the picture just covers the square
+      const draw = () => {
+        const s = sc(), w = iw * s, h = ih * s, mx = (w - F) / 2, my = (h - F) / 2;
+        ox = Math.min(mx, Math.max(-mx, ox)); oy = Math.min(my, Math.max(-my, oy));   // never show an empty edge
+        im.style.width = w + 'px'; im.style.height = h + 'px'; im.style.left = (F / 2 - w / 2 + ox) + 'px'; im.style.top = (F / 2 - h / 2 + oy) + 'px'; zr.value = z;
+      };
+      const zoomAt = (nz, px, py) => { nz = Math.min(4, Math.max(1, nz)); const k = nz / z; ox = px - (px - ox) * k; oy = py - (py - oy) * k; z = nz; draw(); };   // px, py: fixed point from the frame centre
+      const rel = (x, y) => { const r = st.getBoundingClientRect(); return [x - r.left - r.width / 2, y - r.top - r.height / 2]; };
+      const pts = new Map(); let last = null;
+      const snap = () => { const a = [...pts.values()]; if (!a.length) return null;
+        return { n: a.length, x: a.reduce((s, p) => s + p.x, 0) / a.length, y: a.reduce((s, p) => s + p.y, 0) / a.length, dist: a.length > 1 ? Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) : 0 }; };
+      st.onpointerdown = (e) => { e.preventDefault(); try { st.setPointerCapture(e.pointerId); } catch (er) {} pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); last = snap(); };
+      st.onpointermove = (e) => {
+        if (!pts.has(e.pointerId)) return;
+        pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); const now = snap();
+        if (last && now.n === last.n) {   // one finger / mouse: move; two fingers: move + pinch zoom
+          ox += now.x - last.x; oy += now.y - last.y;
+          if (now.n > 1 && last.dist > 0) { const [px, py] = rel(now.x, now.y); zoomAt(z * now.dist / last.dist, px, py); } else draw();
+        }
+        last = now;
+      };
+      st.onpointerup = st.onpointercancel = (e) => { pts.delete(e.pointerId); last = snap(); };
+      st.addEventListener('wheel', (e) => { e.preventDefault(); const [px, py] = rel(e.clientX, e.clientY); zoomAt(z * Math.exp(-e.deltaY / 300), px, py); }, { passive: false });
+      zr.oninput = () => zoomAt(+zr.value, 0, 0);
+      const onResize = () => { const nF = st.clientWidth; if (nF && nF !== F) { ox *= nF / F; oy *= nF / F; F = nF; draw(); } };
+      const onKey = (e) => { if (e.key === 'Escape') done(null); };
+      addEventListener('resize', onResize); addEventListener('keydown', onKey);
+      const done = (v) => {
+        cropOpen = false; d.remove(); document.body.style.overflow = bodyOv;
+        removeEventListener('resize', onResize); removeEventListener('keydown', onKey); if (own) URL.revokeObjectURL(url); res(v);
+      };
+      d.querySelector('#cropCancel').onclick = () => done(null);
+      d.querySelector('#cropSave').onclick = () => {
+        const O = 400, k = O / F, s = sc(), c = document.createElement('canvas'); c.width = c.height = O;
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, O, O); x.imageSmoothingQuality = 'high';
+        x.drawImage(img, (F / 2 - iw * s / 2 + ox) * k, (F / 2 - ih * s / 2 + oy) * k, iw * s * k, ih * s * k);
+        done(jpegUnder(c));
+      };
+      draw(); d.querySelector('#cropSave').focus();
     };
-    img.onerror = rej; img.src = url;
+    img.src = url;
   });
 }
 function bindForm(b) {
-  $('#f_photo').onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { formPhoto = await resizePhoto(f); $('#phPrev').innerHTML = ava({ photo: formPhoto }); $('#phDel').hidden = false; } catch (er) { onErr(er); } };
-  $('#phDel').onclick = () => { formPhoto = ''; $('#phPrev').innerHTML = ava({ name: $('#f_name').value }); $('#phDel').hidden = true; };
+  const setPh = (p) => { formPhoto = p; $('#phPrev').innerHTML = p ? ava({ photo: p }) : ava({ name: $('#f_name').value }); $('#phDel').hidden = $('#phAdj').hidden = !p; };
+  $('#f_photo').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const p = await cropPhoto(f); if (p) setPh(p); } catch (er) { onErr(er); } };
+  $('#phAdj').onclick = async () => { try { const p = await cropPhoto(formPhoto); if (p) setPh(p); } catch (er) { onErr(er); } };   // re-crop the stored picture
+  $('#phDel').onclick = () => setPh('');
   $('#fCancel').onclick = () => history.back();
   if (b) bindSupp(b);
   if ($('#fDel')) $('#fDel').onclick = async () => {

@@ -1,6 +1,6 @@
 
 # E2E against Firebase emulators (auth+firestore+hosting). Run via: firebase emulators:exec --only auth,firestore,hosting --project demo-best "python -I test/e2e.py"
-import json, sys, urllib.request, datetime, os
+import json, sys, urllib.request, datetime, os, struct
 sys.stdout.reconfigure(encoding="utf-8")
 from playwright.sync_api import sync_playwright
 FS = "http://127.0.0.1:8080/v1/projects/demo-best/databases/(default)/documents"
@@ -69,6 +69,25 @@ for n, ids in att.items(): put("/attendance/" + sun(n), {"ids": ids, "by": "staf
 put("/bests/b-wang/notes/n-lee", {"text": "喜歡唱詩歌，可以邀請加入詩班", "by": "staff-lee", "byName": "李姊妹", "at": datetime.datetime.utcnow()})
 put("/bests/b-wang/logs/l1", {"date": sun(1), "method": "visit", "content": "家庭探訪，一起吃晚餐", "prayer": "工作穩定", "by": "staff-park"})
 
+# ---------- crop test picture (O62): 800x400, left half red, right half blue (24-bit BMP, no extra libraries) ----------
+def bmp(w, h, px):
+    row = (w * 3 + 3) & ~3; data = bytearray()
+    for y in range(h - 1, -1, -1):
+        r = bytearray()
+        for x in range(w): R_, G_, B_ = px(x, y); r += bytes((B_, G_, R_))
+        data += r + b"\0" * (row - w * 3)
+    return b"BM" + struct.pack("<IHHI", 54 + len(data), 0, 0, 54) + struct.pack("<IiiHHIIiiII", 40, w, h, 1, 24, 0, len(data), 2835, 2835, 0, 0) + bytes(data)
+CROPIMG = {"name": "crop-test.bmp", "mimeType": "image/bmp", "buffer": bmp(800, 400, lambda x, y: (220, 30, 30) if x < 400 else (30, 60, 220))}
+GEO = "() => { const s = document.querySelector('#cropSt').getBoundingClientRect(), i = document.querySelector('#cropImg').getBoundingClientRect(); return [s.left, s.top, s.width, s.height, i.left - s.left, i.top - s.top, i.width]; }"
+PIX = """async (pts) => { const src = document.querySelector('#phPrev img').src; const im = new Image(); im.src = src; await im.decode();
+  const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
+  return [im.naturalWidth, im.naturalHeight, src.length, pts.map(([a, b]) => [...x.getImageData(a, b, 1, 1).data.slice(0, 3)])]; }"""
+TOUCH = """(steps) => { const st = document.querySelector('#cropSt');
+  for (const [type, id, x, y] of steps) st.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 11, clientX: x, clientY: y, bubbles: true, cancelable: true, buttons: type === 'pointerup' ? 0 : 1 })); }"""
+RED = lambda p: p[0] > 150 and p[1] < 100 and p[2] < 100
+BLUE = lambda p: p[2] > 150 and p[0] < 100
+near = lambda a, b, tol=2: abs(a - b) <= tol
+
 errors = []
 def W(page, sel, timeout=20000):   # wait_for_selector + state dump on timeout
     try: return page.wait_for_selector(sel, timeout=timeout)
@@ -92,6 +111,7 @@ with sync_playwright() as p:
         br = p.chromium.launch(executable_path=r"C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe")
         DEV = {"viewport": {"width": 390, "height": 844}, "device_scale_factor": 2, "is_mobile": True, "has_touch": True}
     print("engine:", ENGINE, br.version, DEV.get("viewport"), flush=True)
+    FX = DEV["viewport"]["width"] / 390   # Windows WebKit DPI compensation factor (1 for Edge)
     _c = br.new_context(**DEV); _p = _c.new_page(); _p.goto("http://127.0.0.1:5000/install.html")
     print("css viewport:", _p.evaluate("[innerWidth, innerHeight, Math.round(devicePixelRatio*100)/100, navigator.userAgent]"), flush=True); _c.close()
     ctx = br.new_context(**DEV, locale="ko-KR", accept_downloads=True)
@@ -151,6 +171,7 @@ with sync_playwright() as p:
     pg.fill("#f_prayer", "女兒身體健康"); pg.fill("#f_memo", "喜歡詩歌")
     pg.select_option("#f_caretaker", "staff-lee")
     pg.set_input_files("#f_photo", os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "public", "icon-512.png"))
+    pg.wait_for_selector("#cropDlg"); pg.click("#cropSave"); pg.wait_for_selector("#cropDlg", state="detached")   # crop dialog (O62): keep the default centred square
     pg.wait_for_timeout(500)
     fm = pg.evaluate("""() => { const m = document.querySelector('#f_memo'), p = document.querySelector('#f_prayer');
       return [Math.round(document.querySelector('#phPrev .ava').getBoundingClientRect().width), m.closest('label').textContent.trim(), !!(m.compareDocumentPosition(p) & 4),
@@ -200,6 +221,62 @@ with sync_playwright() as p:
     check("contact log saved + lastContact/nextAction updated", len(logs) == 1 and logs[0][1]["method"] == "line" and b["lastContact"] == T and b["nextDue"] == T, (logs, b["lastContact"], b["nextAction"]))
     pg.wait_for_selector(".log")
     pg.screenshot(path=f"{OUT}/flow-4-detail-ko.png")
+    # ---------- photo crop dialog (O62): drag to move, slider / pinch / wheel to zoom, saved avatar = chosen area ----------
+    go(pg, "#edit/" + bid); pg.wait_for_selector("#f_name"); pg.wait_for_timeout(400)
+    check("edit form: existing photo shows the 'adjust photo' button", pg.is_visible("#phAdj") and pg.inner_text("#phAdj") == "사진 조정")
+    pg.screenshot(path=f"{OUT}/crop-0-before-ko.png")
+    pg.set_input_files("#f_photo", files=[CROPIMG]); pg.wait_for_selector("#cropDlg"); pg.wait_for_timeout(300)
+    g = pg.evaluate(GEO); F = g[2]
+    check("crop dialog: square frame, picture covers it, centred", near(g[2], g[3]) and F >= 300 and near(g[6], 2 * F) and near(g[4], -F / 2) and near(g[5], 0), g)
+    check("crop dialog fits the phone width (390px), no overflow", pg.evaluate("[...document.querySelectorAll('#cropDlg *:not(#cropImg)')].every((e) => e.getBoundingClientRect().right <= innerWidth + 1) && document.documentElement.scrollWidth <= innerWidth + 1"))
+    pg.screenshot(path=f"{OUT}/crop-1-open-ko.png")
+    cx, cy = g[0] + F / 2, g[1] + F / 2
+    pg.fill("#cropZoom", "2"); pg.dispatch_event("#cropZoom", "input"); g2 = pg.evaluate(GEO)
+    check("crop: zoom slider x2 doubles the picture size", near(g2[6], 4 * F), (g2[6], 4 * F))
+    pg.evaluate(TOUCH, [["pointerdown", 11, cx - 40, cy], ["pointerdown", 12, cx + 40, cy], ["pointermove", 12, cx + 80, cy], ["pointerup", 12, cx + 80, cy], ["pointerup", 11, cx - 40, cy]])
+    g3 = pg.evaluate(GEO)
+    check("crop: two-finger pinch zooms (80px -> 120px apart = x1.5)", near(g3[6], 6 * F, 3), (g3[6], 6 * F))
+    pg.screenshot(path=f"{OUT}/crop-2-zoomed-ko.png")
+    pg.fill("#cropZoom", "1"); pg.dispatch_event("#cropZoom", "input"); gb = pg.evaluate(GEO)
+    pg.evaluate(TOUCH, [["pointerdown", 11, cx, cy], ["pointermove", 11, cx + 30, cy + 25], ["pointerup", 11, cx + 30, cy + 25]])
+    g4 = pg.evaluate(GEO)
+    check("crop: one-finger drag moves the picture (sideways only as far as the edge; no vertical room at x1)", near(g4[4], gb[4] + 30) and near(g4[5], 0) and near(gb[6], 2 * F), (gb, g4))
+    pg.mouse.move(cx, cy); pg.mouse.down(); pg.mouse.move(cx + F * 0.3, cy, steps=5); pg.mouse.move(cx + F, cy, steps=5); pg.mouse.up()
+    g5 = pg.evaluate(GEO)
+    check("crop: mouse drag moves it; stops at the picture edge (no empty border)", near(g5[4], 0) and near(g5[6], 2 * F), g5)
+    pg.screenshot(path=f"{OUT}/crop-3-moved-left-part-ko.png")
+    pg.click("#cropSave"); pg.wait_for_selector("#cropDlg", state="detached")
+    px = pg.evaluate(PIX, [[20, 200], [200, 200], [380, 200], [200, 20], [200, 380]])
+    check("crop saved: 400x400 JPEG <= 280KB showing ONLY the chosen (left, red) part", px[0] == 400 and px[1] == 400 and px[2] <= 280000 and all(RED(p) for p in px[3]), px)
+    pg.screenshot(path=f"{OUT}/crop-4-after-ko.png")
+    saved = pg.evaluate("document.querySelector('#phPrev img').src")
+    pg.click("#phAdj"); pg.wait_for_selector("#cropDlg"); g6 = pg.evaluate(GEO)
+    check("adjust: re-opens the stored photo (square, covers the frame)", near(g6[6], g6[2]) and near(g6[4], 0))
+    pg.click("#cropCancel"); pg.wait_for_selector("#cropDlg", state="detached")
+    check("adjust -> cancel: photo unchanged", pg.evaluate("document.querySelector('#phPrev img').src") == saved)
+    pg.set_input_files("#f_photo", files=[CROPIMG]); pg.wait_for_selector("#cropDlg"); pg.keyboard.press("Escape"); pg.wait_for_selector("#cropDlg", state="detached")
+    check("new pick -> Esc/cancel keeps the previous photo", pg.evaluate("document.querySelector('#phPrev img').src") == saved)
+    pg.click("#fSave"); pg.wait_for_selector(".pipe"); pg.wait_for_timeout(800)
+    check("form Save stores the cropped photo", get("/bests/" + bid)["photo"] == saved)
+    pg.screenshot(path=f"{OUT}/crop-5-detail-after-ko.png")
+    # PC: mouse wheel zoom + mouse drag in a desktop window
+    cp_ = br.new_context(viewport={"width": round(1280 * FX), "height": round(800 * FX)}); pp = cp_.new_page()
+    pp.on("pageerror", lambda e: errors.append("pc:" + str(e)))
+    pp.add_init_script("localStorage.setItem('best.lang', 'zh')")
+    pp.goto(f"http://127.0.0.1:5000/?k={KEY}"); W(pp, "#tabs:not([hidden])", timeout=20000)
+    pp.goto("http://127.0.0.1:5000/#edit/" + bid); W(pp, "#f_name"); pp.wait_for_timeout(400)
+    pp.set_input_files("#f_photo", files=[CROPIMG]); pp.wait_for_selector("#cropDlg"); pp.wait_for_timeout(300)
+    q = pp.evaluate(GEO); QF = q[2]; qx, qy = q[0] + QF / 2, q[1] + QF / 2
+    pp.mouse.move(qx, qy); pp.mouse.wheel(0, -300); pp.wait_for_timeout(300); q2 = pp.evaluate(GEO)
+    check("PC: mouse wheel zooms in (x e = 2.72)", near(q2[6], 2 * QF * 2.718, 4), (q2[6], 2 * QF * 2.718))
+    pp.mouse.move(qx, qy); pp.mouse.down(); pp.mouse.move(qx - QF * 3, qy, steps=8); pp.mouse.up(); q3 = pp.evaluate(GEO)
+    check("PC: mouse drag to the right part, stops at the edge", near(q3[4] + q3[6], QF), q3)
+    pp.screenshot(path=f"{OUT}/crop-6-pc-zh.png")
+    pp.click("#cropSave"); pp.wait_for_selector("#cropDlg", state="detached")
+    qp = pp.evaluate(PIX, [[20, 200], [200, 200], [380, 200]])
+    check("PC: saved avatar shows the chosen (right, blue) part", qp[0] == 400 and all(BLUE(p) for p in qp[3]), qp)
+    pp.screenshot(path=f"{OUT}/crop-7-pc-after-zh.png")
+    cp_.close()
     # attendance
     pg.click("a[data-tab=att]"); pg.wait_for_selector("#attDay")
     pg.fill("#attDay", sun(0)); pg.dispatch_event("#attDay", "change"); pg.wait_for_timeout(500)
@@ -328,6 +405,11 @@ with sync_playwright() as p:
             pg.screenshot(path=f"{OUT}/{lang}-{name}.png"); pg.screenshot(path=f"{OUT}/{lang}-{name}-full.png", full_page=True)
             b_ = leftovers(pg, lang)
             if b_: bad_all[name] = b_
+            if name == "register":   # crop dialog text too (O62)
+                pg.set_input_files("#f_photo", files=[CROPIMG]); pg.wait_for_selector("#cropDlg"); pg.wait_for_timeout(300)
+                pg.screenshot(path=f"{OUT}/{lang}-crop.png"); b_ = leftovers(pg, lang)
+                if b_: bad_all["crop"] = b_
+                pg.click("#cropCancel"); pg.wait_for_selector("#cropDlg", state="detached")
             z = pg.evaluate("[document.documentElement.scrollWidth, innerWidth, Math.round(visualViewport.width)]")
             if z[0] > z[1] + 1 or z[2] < z[1] - 1: zoom_bad.append((lang, name, z))
         pg.goto("http://127.0.0.1:5000/install.html"); pg.wait_for_selector("ol"); pg.wait_for_timeout(300)
