@@ -398,7 +398,10 @@ function errMsg(e) {
 }
 function onErr(e) { console.error(e); toast(errMsg(e)); }
 let rerenderTimer = 0;
-function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => { if (cropOpen) return; const a = document.activeElement; if (!a || !a.matches('input,textarea,select')) render(); else if ((route().name === 'home' && a.id !== 'askNm') || route().name === 'att') render(); }, 30); }
+function rerender() { clearTimeout(rerenderTimer); rerenderTimer = setTimeout(() => {
+  if (cropOpen) { cropMissed = true; return; }   // replayed when the crop dialog closes
+  if (['new', 'edit'].includes(route().name) && $('#f_name')) return;   // an open form needs no live data: never rebuild it (keeps typed text + a just-cropped photo; O62 r1)
+  const a = document.activeElement; if (!a || !a.matches('input,textarea,select')) render(); else if ((route().name === 'home' && a.id !== 'askNm') || route().name === 'att') render(); }, 30); }
 
 /* ---------- routing ---------- */
 function route() { const h = location.hash.slice(1) || 'home'; const [name, id] = h.split('/'); return { name, id }; }
@@ -573,11 +576,11 @@ function bindList() {
 }
 
 /* ---------- register / edit form ---------- */
-let formPhoto = null;
+let formPhoto = null, formSrc = null;   // formSrc: the original picked File + last crop, so 'adjust' can zoom back out (this form visit only, nothing extra stored)
 function opt(list, cur, pfx) { return '<option value="">' + esc(t('none')) + '</option>' + list.map((x) => '<option value="' + x + '"' + (cur === x ? ' selected' : '') + '>' + esc(t(pfx + x)) + '</option>').join(''); }
 function viewForm(b) {
   const v = b || { firstVisit: today() };
-  formPhoto = v.photo || '';
+  formPhoto = v.photo || ''; formSrc = null;
   const staffArr = [...staff.values()].filter((s) => s.active || s.id === v.caretaker);
   const inp = (k, type = 'text', extra = '') => '<label class="f">' + esc(t(k)) + '<input class="i" id="f_' + k + '" type="' + type + '" value="' + esc(v[k] || '') + '" ' + extra + '></label>';
   const ta = (k) => '<label class="f">' + esc(t(k)) + '<textarea class="i" id="f_' + k + '" maxlength="2000">' + esc(v[k] || '') + '</textarea></label>';
@@ -598,13 +601,14 @@ function viewForm(b) {
     (b && meDoc.role === 'admin' ? '<button class="btn warn wide" id="fDel">' + esc(t('del')) + '</button>' : '') + '</div>';
 }
 /* ---------- photo crop: drag to move, slider / pinch / wheel to zoom, then save a square JPEG (owner O62) ---------- */
-let cropOpen = false;   // the crop dialog lives on <body>; data re-renders wait while it is open
+let cropOpen = false, cropMissed = false;   // the crop dialog lives on <body>; data re-renders wait while it is open
 function jpegUnder(c) {   // same size limit as before: <= 280 KB (rules allow 300000 chars)
   let q = 0.8, out = c.toDataURL('image/jpeg', q);
   while (out.length > 280000 && q > 0.3) { q -= 0.1; out = c.toDataURL('image/jpeg', q); }
   return out;
 }
-function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (adjust); resolves a 400x400 JPEG data URL, or null on cancel
+function cropPhoto(src, init) {   // src: a File (new pick / adjust from the original) or the stored data URL; init: last {z, rx, ry}
+  // resolves { photo: 400x400 JPEG data URL, state: {z, rx, ry} }, or null on cancel
   return new Promise((res, rej) => {
     const own = typeof src !== 'string', url = own ? URL.createObjectURL(src) : src, img = new Image();
     img.onerror = () => { if (own) URL.revokeObjectURL(url); rej(new Error('photo')); };
@@ -618,7 +622,7 @@ function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (ad
       const st = d.querySelector('#cropSt'), im = d.querySelector('#cropImg'), zr = d.querySelector('#cropZoom');
       im.src = url;
       const iw = img.naturalWidth, ih = img.naturalHeight;
-      let F = st.clientWidth, z = 1, ox = 0, oy = 0;   // F: frame size (CSS px); ox/oy: image centre offset from the frame centre
+      let F = st.clientWidth, z = init ? init.z : 1, ox = init ? init.rx * F : 0, oy = init ? init.ry * F : 0;   // F: frame size (CSS px); ox/oy: image centre offset from the frame centre
       const sc = () => Math.max(F / iw, F / ih) * z;   // z = 1: the picture just covers the square
       const draw = () => {
         const s = sc(), w = iw * s, h = ih * s, mx = (w - F) / 2, my = (h - F) / 2;
@@ -630,7 +634,7 @@ function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (ad
       const pts = new Map(); let last = null;
       const snap = () => { const a = [...pts.values()]; if (!a.length) return null;
         return { n: a.length, x: a.reduce((s, p) => s + p.x, 0) / a.length, y: a.reduce((s, p) => s + p.y, 0) / a.length, dist: a.length > 1 ? Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) : 0 }; };
-      st.onpointerdown = (e) => { e.preventDefault(); try { st.setPointerCapture(e.pointerId); } catch (er) {} pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); last = snap(); };
+      st.onpointerdown = (e) => { if (e.button > 0) return; e.preventDefault(); try { st.setPointerCapture(e.pointerId); } catch (er) {} pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); last = snap(); };
       st.onpointermove = (e) => {
         if (!pts.has(e.pointerId)) return;
         pts.set(e.pointerId, { x: e.clientX, y: e.clientY }); const now = snap();
@@ -641,21 +645,24 @@ function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (ad
         last = now;
       };
       st.onpointerup = st.onpointercancel = (e) => { pts.delete(e.pointerId); last = snap(); };
-      st.addEventListener('wheel', (e) => { e.preventDefault(); const [px, py] = rel(e.clientX, e.clientY); zoomAt(z * Math.exp(-e.deltaY / 300), px, py); }, { passive: false });
+      st.addEventListener('wheel', (e) => { e.preventDefault(); const [px, py] = rel(e.clientX, e.clientY); zoomAt(z * Math.exp(-e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? F : 1) / 300), px, py); }, { passive: false });   // deltaMode 1 = lines (Firefox), 2 = pages
       zr.oninput = () => zoomAt(+zr.value, 0, 0);
       const onResize = () => { const nF = st.clientWidth; if (nF && nF !== F) { ox *= nF / F; oy *= nF / F; F = nF; draw(); } };
       const onKey = (e) => { if (e.key === 'Escape') done(null); };
-      addEventListener('resize', onResize); addEventListener('keydown', onKey);
+      const onNav = () => done(null);   // back button / any page change closes the dialog (the form it belongs to is gone)
+      addEventListener('resize', onResize); addEventListener('keydown', onKey); addEventListener('hashchange', onNav);
       const done = (v) => {
         cropOpen = false; d.remove(); document.body.style.overflow = bodyOv;
-        removeEventListener('resize', onResize); removeEventListener('keydown', onKey); if (own) URL.revokeObjectURL(url); res(v);
+        removeEventListener('resize', onResize); removeEventListener('keydown', onKey); removeEventListener('hashchange', onNav); if (own) URL.revokeObjectURL(url);
+        if (cropMissed) { cropMissed = false; rerender(); }
+        res(v);
       };
       d.querySelector('#cropCancel').onclick = () => done(null);
       d.querySelector('#cropSave').onclick = () => {
         const O = 400, k = O / F, s = sc(), c = document.createElement('canvas'); c.width = c.height = O;
         const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, O, O); x.imageSmoothingQuality = 'high';
         x.drawImage(img, (F / 2 - iw * s / 2 + ox) * k, (F / 2 - ih * s / 2 + oy) * k, iw * s * k, ih * s * k);
-        done(jpegUnder(c));
+        done({ photo: jpegUnder(c), state: { z, rx: ox / F, ry: oy / F } });
       };
       draw(); d.querySelector('#cropSave').focus();
     };
@@ -663,9 +670,10 @@ function cropPhoto(src) {   // src: a File (new pick) or the stored data URL (ad
   });
 }
 function bindForm(b) {
-  const setPh = (p) => { formPhoto = p; $('#phPrev').innerHTML = p ? ava({ photo: p }) : ava({ name: $('#f_name').value }); $('#phDel').hidden = $('#phAdj').hidden = !p; };
-  $('#f_photo').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const p = await cropPhoto(f); if (p) setPh(p); } catch (er) { onErr(er); } };
-  $('#phAdj').onclick = async () => { try { const p = await cropPhoto(formPhoto); if (p) setPh(p); } catch (er) { onErr(er); } };   // re-crop the stored picture
+  const setPh = (p, s) => { formPhoto = p; formSrc = s || null; $('#phPrev').innerHTML = p ? ava({ photo: p }) : ava({ name: $('#f_name').value }); $('#phDel').hidden = $('#phAdj').hidden = !p; };
+  $('#f_photo').onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { const r = await cropPhoto(f); if (r) setPh(r.photo, { file: f, state: r.state }); } catch (er) { onErr(er); } };
+  $('#phAdj').onclick = async () => {   // re-crop: from the original picked this visit (can zoom back out), else from the stored 400px photo (can only zoom in)
+    try { const o = formSrc, r = o ? await cropPhoto(o.file, o.state) : await cropPhoto(formPhoto); if (r) setPh(r.photo, o ? { file: o.file, state: r.state } : null); } catch (er) { onErr(er); } };
   $('#phDel').onclick = () => setPh('');
   $('#fCancel').onclick = () => history.back();
   if (b) bindSupp(b);
